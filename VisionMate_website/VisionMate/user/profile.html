@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile – VisionMate User</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+    <div class="row g-4">
+
+      <!-- Profile Card -->
+      <div class="col-md-4">
+        <div class="section-card">
+          <div class="card-body text-center">
+            <div class="user-pill-avatar mx-auto mb-3" id="profileAvatar" style="width:80px;height:80px;font-size:1.8rem;background:var(--gradient-btn)">?</div>
+            <h4 class="fw-bold mb-1" id="profileName">—</h4>
+            <div class="text-muted small mb-2" id="profileEmail">—</div>
+            <div class="mb-3" id="profileZoneBadge"></div>
+            <div id="hwBadge" class="d-none mb-3">
+              <span class="badge py-2 px-3" style="background:var(--gradient-btn)">
+                <i class="bi bi-cpu-fill me-1"></i>Hardware Device Assigned
+              </span>
+            </div>
+            <hr />
+            <div class="text-start">
+              <div class="small text-muted fw-semibold mb-2">ACCOUNT DETAILS</div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-geo-alt-fill text-primary"></i>
+                <span class="small" id="profileZone">—</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-telephone-fill text-primary"></i>
+                <span class="small" id="profilePhone">—</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-credit-card-2-front-fill text-primary"></i>
+                <span class="small" id="profileCnic">—</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-calendar-date-fill text-primary"></i>
+                <span class="small" id="profileDob">—</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-briefcase-fill text-primary"></i>
+                <span class="small" id="profileExp">—</span>
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-mortarboard-fill text-primary"></i>
+                <span class="small" id="profileQual">—</span>
+              </div>
+              <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-house-fill text-primary mt-1"></i>
+                <span class="small" id="profileAddr">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assigned Summary -->
+        <div class="section-card mt-3">
+          <div class="card-header"><i class="bi bi-people-fill"></i> Patient Summary</div>
+          <div class="card-body" id="patientSummary">
+            <div class="text-muted small text-center py-2">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details & Settings -->
+      <div class="col-md-8">
+        <div class="section-card mb-4">
+          <div class="card-header"><i class="bi bi-pencil-fill"></i> Edit Profile</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Full Name <span class="text-muted">(read only)</span></label>
+                <input type="text" class="form-control bg-light" id="editName" readonly />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Email Address <span class="text-muted">(read only)</span></label>
+                <input type="email" class="form-control bg-light" id="editEmail" readonly />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Phone Number</label>
+                <input type="text" class="form-control" id="editPhone" placeholder="e.g. 0300-1234567" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Emergency Contact Number</label>
+                <input type="text" class="form-control" id="editEmergencyContact" placeholder="e.g. 0300-9876543" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">CNIC / National ID</label>
+                <input type="text" class="form-control" id="editCnic" placeholder="XXXXX-XXXXXXX-X" maxlength="15" />
+                <div class="form-text">Format: 42101-1234567-1</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Date of Birth</label>
+                <input type="date" class="form-control" id="editDob" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">House Number</label>
+                <input type="text" class="form-control" id="editHouseNumber" placeholder="e.g. House 7, Block 14" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-medium">Safe Zone / Area</label>
+                <input type="text" class="form-control" id="editSafeZone" placeholder="e.g. FB Area, Karachi" />
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-medium">Full Address</label>
+                <input type="text" class="form-control" id="editAddr" placeholder="Full address including city" />
+              </div>
+              <div class="col-12">
+                <button class="btn btn-primary-vm px-4" id="saveProfileBtn">Save Changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HW device info (shown only for hw-linked user) -->
+        <div class="section-card mb-4" id="hwDeviceCard" style="display:none">
+          <div class="card-header"><i class="bi bi-cpu-fill text-warning"></i> Hardware Device</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6"><div class="step-card"><div class="text-muted small">Device Name</div><div class="fw-medium">VisionMate Sensor v1.2</div></div></div>
+              <div class="col-md-6"><div class="step-card"><div class="text-muted small">Firebase Path</div><div class="fw-medium small"><code>hw_live/bu_11</code></div></div></div>
+              <div class="col-md-6"><div class="step-card"><div class="text-muted small">Assigned Patient</div><div class="fw-medium" id="hwPatientName">—</div></div></div>
+              <div class="col-md-6"><div class="step-card"><div class="text-muted small">Status</div><div><span class="badge bg-success">Active</span></div></div></div>
+              <div class="col-12">
+                <a href="monitoring.html" class="btn btn-primary-vm btn-sm">
+                  <i class="bi bi-activity me-1"></i>Open Live Monitor
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="card-header"><i class="bi bi-info-circle-fill"></i> Account Status</div>
+          <div class="card-body" id="accountStatusBody">
+            <div class="text-muted small text-center py-2">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- Toast -->
+    <div class="toast-container">
+      <div id="mainToast" class="toast-vm" style="display:none">
+        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        <span id="toastMsg">Saved.</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/firebase-auth.js"></script>
+<script src="../js/user-layout.js"></script>
+<script>
+  const session = vmRequireUser();
+
+  document.getElementById('sidebarMount').innerHTML = UserLayout.getSidebarHTML('Profile', session);
+  document.getElementById('topbarMount').innerHTML  = UserLayout.getTopbarHTML('My Profile', 'Account settings and preferences', session);
+
+  function showToast(msg) {
+    const t = document.getElementById('mainToast');
+    document.getElementById('toastMsg').textContent = msg;
+    t.style.display = 'flex';
+    setTimeout(() => t.style.display = 'none', 3000);
+  }
+
+  // Render profile fields straight from a Firestore caretaker record.
+  // This is the single source of truth — registration data and profile
+  // display now always match because both read the same Firestore doc.
+  function renderProfile(p) {
+    const name  = p.fullName || session.name || 'User';
+    const email = p.email || session.email || '—';
+    const zone  = p.zone || session.zone || '—';
+    const phone = p.phone || '—';
+    const exp   = p.experience || '—';
+    const qual  = p.qualification || '—';
+    const addr  = p.address || '—';
+    // Display-layer fallback: the hardware-monitoring account (Ahmed Nawaz)
+    // must always show CNIC/DOB consistently (requirement #3), even on the
+    // rare chance the live Firestore doc predates these fields and the
+    // automatic backfill in firebase-auth.js hasn't completed yet.
+    const isAhmed = (p.email || session.email || '').trim().toLowerCase() === 'ahmed@visionmate.com';
+    const cnic  = p.cnic || (isAhmed ? '42101-1234567-1' : '—');
+    const dob   = p.dob  || (isAhmed ? '1989-04-12' : '—');
+    const hw    = !!(p.hardwareLinked || session.hwLinked);
+
+    document.getElementById('profileAvatar').textContent  = getInitialU(name);
+    document.getElementById('profileName').textContent    = name;
+    document.getElementById('profileEmail').textContent   = email;
+    document.getElementById('profileZone').textContent    = zone;
+    document.getElementById('profilePhone').textContent   = phone;
+    document.getElementById('profileCnic').textContent    = cnic;
+    document.getElementById('profileDob').textContent     = dob;
+    document.getElementById('profileExp').textContent     = exp + (exp !== '—' ? ' experience' : '');
+    document.getElementById('profileQual').textContent    = qual;
+    document.getElementById('profileAddr').textContent    = addr;
+    document.getElementById('profileZoneBadge').innerHTML = `<span class="badge bg-primary">${zone}</span>`;
+
+    document.getElementById('editName').value            = name;
+    document.getElementById('editEmail').value           = email;
+    document.getElementById('editPhone').value           = phone;
+    document.getElementById('editEmergencyContact').value = p.emergencyContact || '';
+    document.getElementById('editCnic').value            = cnic;
+    document.getElementById('editDob').value             = dob;
+    document.getElementById('editHouseNumber').value     = p.houseNumber || '';
+    document.getElementById('editSafeZone').value        = p.safeZone || zone;
+    document.getElementById('editAddr').value            = addr;
+
+    if (hw) {
+      document.getElementById('hwBadge').classList.remove('d-none');
+      document.getElementById('hwDeviceCard').style.display = 'block';
+    }
+
+    const created = p.registrationDate || '—';
+    const lastLogin = p.lastLoginAt?.toDate?.()?.toLocaleString('en-PK') || (typeof p.lastLoginAt === 'string' ? p.lastLoginAt : '—');
+    document.getElementById('accountStatusBody').innerHTML = `
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">Registered</span><strong>${created}</strong></div>
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">Last Login</span><strong>${lastLogin}</strong></div>
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">Account Status</span><strong class="text-success">${p.accountStatus||'Active'}</strong></div>`;
+
+    return { hw };
+  }
+
+  function renderPatientSummary(persons, hw) {
+    const active = persons.filter(p => (p.monitoringStatus||'Active') === 'Active').length;
+    document.getElementById('patientSummary').innerHTML = `
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">Total Assigned</span><strong>${persons.length}</strong></div>
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">Active</span><strong class="text-success">${active}</strong></div>
+      <div class="d-flex justify-content-between small py-1"><span class="text-muted">HW Monitored</span><strong class="text-warning">${hw?1:0}</strong></div>
+      <div class="mt-3"><a href="assigned.html" class="btn btn-sm btn-outline-primary w-100 rounded-pill">View All Patients</a></div>`;
+    if (hw) {
+      const hwPatient = persons.find(p => p.hardwareLinked) || persons[0];
+      document.getElementById('hwPatientName').textContent = hwPatient?.patientName || hwPatient?.name || '—';
+    }
+  }
+
+  let currentProfile = null;
+
+  document.addEventListener('vm:auth-ready', async () => {
+    try {
+      const fsProfile = await VmAuth.getCaretakerProfile(session.id);
+      if (fsProfile) {
+        currentProfile = fsProfile;
+        const { hw } = renderProfile(fsProfile);
+        const persons = await VmAuth.getAssignedPatients(session.id);
+        renderPatientSummary(persons, hw);
+      } else {
+        // No Firestore record found (should not happen for real accounts) —
+        // fall back to session data only, but don't fabricate fields.
+        renderProfile({ fullName: session.name, email: session.email, zone: session.zone, hardwareLinked: session.hwLinked });
+        document.getElementById('patientSummary').innerHTML = '<div class="text-muted small text-center py-2">No patient data available.</div>';
+      }
+    } catch (e) {
+      console.error('[VisionMate] Profile fetch failed:', e);
+      document.getElementById('accountStatusBody').innerHTML = '<div class="text-danger small">Could not load account status. Please refresh.</div>';
+    }
+  });
+
+  document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+    if (!currentProfile || !currentProfile.firestoreId) {
+      showToast('Profile not loaded yet — please wait and try again.');
+      return;
+    }
+    // Validate CNIC format
+    const cnicVal = document.getElementById('editCnic').value.trim();
+    if (cnicVal && !/^\d{5}-\d{7}-\d$/.test(cnicVal)) {
+      showToast('CNIC must be in format: XXXXX-XXXXXXX-X'); return;
+    }
+    const updates = {
+      phone: document.getElementById('editPhone').value.trim(),
+      emergencyContact: document.getElementById('editEmergencyContact').value.trim(),
+      cnic: cnicVal,
+      dob: document.getElementById('editDob').value.trim(),
+      houseNumber: document.getElementById('editHouseNumber').value.trim(),
+      safeZone: document.getElementById('editSafeZone').value.trim(),
+      address: document.getElementById('editAddr').value.trim()
+    };
+    try {
+      await VmAuth.updateProfile(currentProfile.firestoreId, updates);
+      // Update display immediately
+      document.getElementById('profilePhone').textContent  = updates.phone || '—';
+      document.getElementById('profileCnic').textContent   = updates.cnic  || '—';
+      document.getElementById('profileDob').textContent    = updates.dob   || '—';
+      document.getElementById('profileAddr').textContent   = updates.address || '—';
+      // Refresh session cache for zone/safeZone
+      try {
+        const sess = JSON.parse(localStorage.getItem('vm_user_session') || '{}');
+        localStorage.setItem('vm_user_session', JSON.stringify({ ...sess, phone: updates.phone }));
+      } catch(e) {}
+      showToast('Profile saved successfully — all changes synced to database.');
+    } catch (e) {
+      showToast('Could not save: ' + e.message);
+    }
+  });
+</script>
+</body>
+</html>

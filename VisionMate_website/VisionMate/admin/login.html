@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login – VisionMate</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div class="auth-bg">
+  <div class="auth-card mx-auto">
+    <div class="auth-header">
+      <a href="../index.html" class="text-decoration-none">
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+          <img src="../logo.png" alt="VisionMate Logo" style="width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(6,182,212,0.5))" />
+          <h1 class="text-white fw-bold mb-0">VisionMate</h1>
+        </div>
+      </a>
+      <p>Smart Assistance &amp; Safety Platform</p>
+    </div>
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+      <div class="card-header admin-theme text-center py-4">
+        <h2 class="fw-bold mb-1">Admin Portal</h2>
+        <p class="mb-0 opacity-90 small">Zone-based monitoring &amp; management</p>
+      </div>
+      <div class="card-body p-4 bg-white">
+        <div id="errorAlert" class="alert alert-danger d-none align-items-center gap-2" role="alert">
+          <i class="bi bi-exclamation-circle-fill"></i>
+          <span id="errorMsg"></span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Email Address</label>
+          <input type="email" id="emailInput" class="form-control bg-light" placeholder="admin@visionmate.com" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Password</label>
+          <div class="position-relative">
+            <input type="password" id="passwordInput" class="form-control bg-light pe-5" placeholder="Enter password" />
+            <button type="button" class="password-toggle" id="togglePwd">
+              <i class="bi bi-eye" id="togglePwdIcon"></i>
+            </button>
+          </div>
+        </div>
+        <button class="btn w-100 py-2 fw-semibold btn-warning text-white" id="loginBtn">Sign In as Admin</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  document.getElementById('togglePwd').addEventListener('click', function() {
+    const input = document.getElementById('passwordInput');
+    const icon  = document.getElementById('togglePwdIcon');
+    if (input.type === 'password') { input.type = 'text'; icon.className = 'bi bi-eye-slash'; }
+    else { input.type = 'password'; icon.className = 'bi bi-eye'; }
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', async function() {
+    const email    = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    const btn      = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in…';
+
+    const result = await vmVerifyAdminCredentials(email, password);
+
+    if (result.ok) {
+      localStorage.setItem('vm_admin_session', JSON.stringify({
+        id: 'admin_1', name: result.name || 'System Administrator', role: 'admin', email
+      }));
+      window.location.href = 'dashboard.html';
+    } else {
+      const err = document.getElementById('errorAlert');
+      document.getElementById('errorMsg').textContent = result.error
+        ? 'Could not reach the server. Please check your connection and try again.'
+        : 'Invalid credentials. Please try again.';
+      err.classList.remove('d-none'); err.classList.add('d-flex');
+      btn.disabled = false;
+      btn.innerHTML = 'Sign In as Admin';
+    }
+  });
+
+  // Redirect if already logged in
+  if (localStorage.getItem('vm_admin_session')) {
+    window.location.href = 'dashboard.html';
+  }
+</script>
+  <div class="text-center mt-3 position-absolute" style="bottom:1.5rem;left:0;right:0"><a href="../user/login.html" class="text-white-50 small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Back to Login</a></div>
+</body>
+</html>

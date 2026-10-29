@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – VisionMate Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Stats Row -->
+    <div class="row g-4 mb-2">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="bi bi-map-fill"></i></div>
+          <div><p class="stat-label">Total Zones</p><p class="stat-value">4</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="bi bi-shield-fill-check"></i></div>
+          <div><p class="stat-label">Total Caretakers</p><p class="stat-value" id="stCaretakers">0</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon purple"><i class="bi bi-person-fill"></i></div>
+          <div><p class="stat-label">Patients</p><p class="stat-value" id="stUsers">0</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon cyan"><i class="bi bi-activity"></i></div>
+          <div><p class="stat-label">Under Monitoring</p><p class="stat-value" id="stMonitoring">0</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-2">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="bi bi-check-circle-fill"></i></div>
+          <div><p class="stat-label">Active Caretakers</p><p class="stat-value" id="stActive">0</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="border-color:#FECACA;background:#FEF2F2">
+          <div class="stat-icon red"><i class="bi bi-cpu-fill"></i></div>
+          <div><p class="stat-label">HW Connected</p><p class="stat-value">1</p></div>
+        </div>
+      </div>
+      </div>
+      <div class="row g-4 mb-2">
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="border-color:#D1FAE5;background:#F0FDF4">
+          <div class="stat-icon green"><i class="bi bi-wifi"></i></div>
+          <div><p class="stat-label">Online Users</p><p class="stat-value" id="stOnline">—</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="border-color:#E2E8F0;background:#F8FAFC">
+          <div class="stat-icon slate"><i class="bi bi-wifi-off"></i></div>
+          <div><p class="stat-label">Offline Users</p><p class="stat-value" id="stOffline">—</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon orange"><i class="bi bi-x-circle-fill"></i></div>
+          <div><p class="stat-label">Inactive Caretakers</p><p class="stat-value" id="stInactive">0</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon slate"><i class="bi bi-geo-alt-fill"></i></div>
+          <div><p class="stat-label">Coverage Zones</p><p class="stat-value">Karachi</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-2">
+      <div class="col-lg-6">
+        <div class="section-card">
+          <div class="card-header"><i class="bi bi-bar-chart-fill"></i> Caretakers per Zone</div>
+          <div class="card-body"><canvas id="zoneChart" height="180"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="section-card">
+          <div class="card-header"><i class="bi bi-pie-chart-fill"></i> Caretaker Status</div>
+          <div class="card-body d-flex align-items-center justify-content-center">
+            <div style="max-width:260px;width:100%"><canvas id="statusChart" height="220"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone Summary Cards -->
+    <div class="section-card">
+      <div class="card-header"><i class="bi bi-map-fill"></i> Zone Overview</div>
+      <div class="card-body">
+        <div class="row g-3" id="zoneSummaryRow"></div>
+      </div>
+    </div>
+
+    <!-- Hardware Alert Banner -->
+    <div class="section-card" style="border-color:#FEF3C7;background:linear-gradient(135deg,#FFFBEB,#fff)">
+      <div class="card-header" style="border-color:#FEF3C7">
+        <i class="bi bi-cpu-fill text-warning"></i> Hardware Integration Status
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark"><i class="bi bi-cpu-fill me-1"></i>HW Linked</span>
+            <strong>Ahmed Nawaz</strong> <span class="text-muted small">– FB Area</span>
+          </div>
+          <span class="text-muted">→</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success">Live</span>
+            <strong>Shahbaz Qureshi</strong> <span class="text-muted small">(Patient, Bu#11)</span>
+          </div>
+          <a href="monitoring.html" class="btn btn-sm btn-primary-vm ms-auto">
+            <i class="bi bi-activity me-1"></i>Open Monitoring Screen
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="section-card">
+      <div class="card-header"><i class="bi bi-clock-history"></i> Recent Activity</div>
+      <div class="card-body" id="recentActivity"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/admin-firestore.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  vmRequireAdmin();
+  document.getElementById('sidebarMount').innerHTML = PortalLayout.getSidebarHTML('Dashboard');
+  document.getElementById('topbarMount').innerHTML  = PortalLayout.getTopbarHTML('System Overview', 'Monitor and manage the VisionMate platform');
+
+  const { zones, caretakers, blindUsers } = VM_DATA;
+
+  // Static stats (fallback)
+  let totalCaretakers = caretakers.length;
+  let onlineCount = 0;
+  document.getElementById('stCaretakers').textContent = caretakers.length;
+  document.getElementById('stUsers').textContent      = blindUsers.length;
+  document.getElementById('stMonitoring').textContent = blindUsers.filter(u => u.monitoringStatus === 'Active').length;
+  document.getElementById('stActive').textContent     = caretakers.filter(c => c.status === 'Active').length;
+  document.getElementById('stInactive').textContent   = caretakers.filter(c => c.status === 'Inactive').length;
+
+  // Real-time Firestore stats overlay
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenCaretakers(fsList => {
+      // Count registered + static
+      const registeredEmails = new Set(fsList.map(f => f.email));
+      const staticNotInFS = caretakers.filter(c => !registeredEmails.has(c.email));
+      totalCaretakers = staticNotInFS.length + fsList.length;
+      onlineCount = fsList.filter(f => f.accountStatus === 'Active').length;
+      const offlineCount = fsList.filter(f => f.accountStatus === 'Offline').length;
+      document.getElementById('stCaretakers').textContent = totalCaretakers;
+      document.getElementById('stActive').textContent = onlineCount + caretakers.filter(c=>c.status==='Active' && !registeredEmails.has(c.email)).length;
+      // Show online/offline badges if elements exist
+      const onlineEl = document.getElementById('stOnline');
+      const offlineEl = document.getElementById('stOffline');
+      if (onlineEl) onlineEl.textContent = onlineCount;
+      if (offlineEl) offlineEl.textContent = offlineCount;
+    });
+    AdminFS.listenPatients(ptList => {
+      // Avoid double-counting Shahbaz Qureshi (static bu_11 superseded by
+      // its Firestore-seeded equivalent, linked via legacyId).
+      const supersededLegacyIds = new Set(ptList.map(p => p.legacyId).filter(Boolean));
+      const staticCount = blindUsers.filter(u => !supersededLegacyIds.has(u.id)).length;
+      document.getElementById('stUsers').textContent = ptList.length + staticCount;
+    });
+  });
+
+  // Zone chart
+  new Chart(document.getElementById('zoneChart'), {
+    type: 'bar',
+    data: {
+      labels: zones.map(z => z.name),
+      datasets: [{
+        label: 'Caretakers',
+        data: zones.map(z => caretakers.filter(c => c.zoneId === z.id).length),
+        backgroundColor: ['#5B3FE8','#06B6D4','#22C55E','#F59E0B'],
+        borderRadius: 6
+      }]
+    },
+    options: { plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
+  });
+
+  // Status pie
+  const active   = caretakers.filter(c => c.status === 'Active').length;
+  const inactive = caretakers.filter(c => c.status === 'Inactive').length;
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Active', 'Inactive'],
+      datasets: [{ data: [active, inactive], backgroundColor: ['#22C55E','#94A3B8'], borderWidth: 0 }]
+    },
+    options: { plugins:{ legend:{ position:'bottom' } } }
+  });
+
+  // Zone summary cards
+  const zoneRow = document.getElementById('zoneSummaryRow');
+  zones.forEach(z => {
+    const ct = caretakers.filter(c => c.zoneId === z.id);
+    const bu = blindUsers.filter(u => u.zoneId === z.id);
+    const hwTag = z.id === 'z4' ? '<span class="badge bg-warning text-dark ms-1"><i class="bi bi-cpu-fill me-1"></i>HW</span>' : '';
+    zoneRow.innerHTML += `
+    <div class="col-md-3">
+      <a href="zones.html?zone=${z.id}" class="user-card d-block text-decoration-none">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div class="stat-icon" style="background:${z.color}20;color:${z.color};width:40px;height:40px;font-size:1.1rem">
+            <i class="bi bi-geo-alt-fill"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">${z.name} ${hwTag}</div>
+            <div class="text-muted small">Karachi</div>
+          </div>
+        </div>
+        <div class="d-flex gap-3 mt-2">
+          <div class="text-center"><div class="fw-bold">${ct.length}</div><div class="text-muted" style="font-size:.75rem">Caretakers</div></div>
+          <div class="text-center"><div class="fw-bold">${bu.length}</div><div class="text-muted" style="font-size:.75rem">Patients</div></div>
+          <div class="text-center"><div class="fw-bold">${ct.filter(c=>c.status==='Active').length}</div><div class="text-muted" style="font-size:.75rem">Active</div></div>
+        </div>
+      </a>
+    </div>`;
+  });
+
+  // Note: a real-time, all-caretakers notification feed already exists
+  // on the dedicated Notifications & Activity page (admin/activity.html →
+  // #adminNotifList), wired to AdminFS.listenAllNotifications. An earlier
+  // version of this page also called that same listener here, but the
+  // panel element it wrote into (#adminNotifPanel) was never present in
+  // this page's markup, so the call was a silent no-op — removed rather
+  // than left as dead code per a "no broken pages / no dead listeners"
+  // pass. The Hardware Integration Status card above already links to
+  // Live Monitoring; the existing "Notifications & Activity" sidebar
+  // link covers the live notification feed for this page.
+
+  // Recent activity — static system baseline + real-time login/logout/signup
+  // events streamed live from the same 'auth_history' collection used by
+  // admin/activity.html (via AdminFS.listenAuthHistory / onSnapshot), so new
+  // events appear instantly with no page refresh needed. Each live entry
+  // shows Caretaker Name, Email, Zone, Activity Type & Date/Time, and can be
+  // permanently deleted (removes it from Firestore + this list, since the
+  // list itself is driven by the same onSnapshot listener).
+  const staticActivities = [
+    { icon:'bi-person-fill',       color:'#5B3FE8', text:'Patient <strong>Shahbaz Qureshi</strong> monitoring activated', time:'System' },
+    { icon:'bi-geo-alt-fill',      color:'#06B6D4', text:'Zone <strong>FB Area</strong> sensor data stream established', time:'System' },
+    { icon:'bi-check-circle-fill', color:'#22C55E', text:'All 4 zones health check completed', time:'System' }
+  ];
+
+  function activityTypeMeta(t) {
+    if (t === 'signup') return { label:'Signup', color:'#0EA5E9', icon:'bi-person-plus-fill' };
+    if (t === 'login')  return { label:'Login',  color:'#22C55E', icon:'bi-box-arrow-in-right' };
+    if (t === 'logout') return { label:'Logout', color:'#94A3B8', icon:'bi-box-arrow-left' };
+    return { label:t || 'Activity', color:'#5B3FE8', icon:'bi-clock-history' };
+  }
+
+  function renderActivity(liveHistory) {
+    const liveHtml = (liveHistory||[]).map(h => {
+      const meta = activityTypeMeta(h.type);
+      const dateStr = (h.createdAtDate || new Date()).toLocaleString('en-PK');
+      return `
+      <div class="timeline-item">
+        <div class="timeline-dot" style="background:${meta.color}"></div>
+        <div class="flex-grow-1">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="small">
+              <i class="bi ${meta.icon} me-1" style="color:${meta.color}"></i>
+              <strong>${h.fullName || '—'}</strong> ${meta.label}
+              <div class="text-muted" style="font-size:.72rem">${h.email || '—'}${h.zone ? ' · ' + h.zone : ''}</div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.68rem" onclick="deleteRecentActivity('${h.firestoreId}')" title="Delete permanently">
+              <i class="bi bi-trash-fill"></i>
+            </button>
+          </div>
+          <div class="text-muted" style="font-size:.72rem">${dateStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const staticHtml = staticActivities.map(a => `
+      <div class="timeline-item">
+        <div class="timeline-dot" style="background:${a.color}"></div>
+        <div>
+          <div class="small">${a.text}</div>
+          <div class="text-muted" style="font-size:.72rem">${a.time}</div>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('recentActivity').innerHTML = (liveHtml + staticHtml) || '<p class="text-muted small">No recent activity.</p>';
+  }
+
+  renderActivity([]);
+
+  document.addEventListener('vm:adminfs-ready', () => {
+    // Real-time: fires again automatically the instant a new login, logout
+    // or signup is written, or an item is deleted — no manual refresh needed.
+    AdminFS.listenAuthHistory(list => {
+      renderActivity(list.slice(0, 10));
+    });
+  });
+
+  async function deleteRecentActivity(firestoreId) {
+    if (!confirm('Permanently delete this activity record? This cannot be undone.')) return;
+    try {
+      await AdminFS.deleteAuthHistoryRecord(firestoreId);
+      // No manual re-render needed — the onSnapshot listener above fires
+      // again automatically and removes it from the page.
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
+  }
+  window.deleteRecentActivity = deleteRecentActivity;
+</script>
+</body>
+</html>

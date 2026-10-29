@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caretakers – VisionMate Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Filters -->
+    <div class="section-card mb-4">
+      <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+        <input type="search" id="ctSearch" class="form-control" placeholder="Search by name, zone, gender…" style="max-width:280px" />
+        <select id="zoneFilter" class="form-select" style="max-width:200px">
+          <option value="">All Zones</option>
+        </select>
+        <select id="statusFilter" class="form-select" style="max-width:160px">
+          <option value="">All Status</option>
+          <option>Active</option>
+          <option>Inactive</option>
+        </select>
+        <span class="ms-auto text-muted small" id="countLabel"></span>
+      </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal fade" id="ctModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header" style="background:var(--gradient-btn)">
+            <h5 class="modal-title text-white"><i class="bi bi-shield-fill-check me-2"></i>Caretaker Profile</h5>
+            <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="ctModalBody"></div>
+          <div class="modal-footer flex-wrap gap-2">
+            <a id="ctViewUsersLink" href="#" class="btn btn-primary-vm btn-sm">
+              <i class="bi bi-people-fill me-1"></i>View Assigned Patients
+            </a>
+            <button class="btn btn-outline-secondary btn-sm" id="ctEditBtn">
+              <i class="bi bi-pencil-fill me-1"></i>Edit
+            </button>
+            <button class="btn btn-outline-danger btn-sm" id="ctDeleteBtn">
+              <i class="bi bi-trash-fill me-1"></i>Delete Account
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-pencil-fill me-2"></i>Edit Caretaker Information</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="editId" />
+            <div class="mb-3"><label class="form-label small fw-medium">Full Name</label><input class="form-control" id="editFullName" /></div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label small fw-medium">Phone</label><input class="form-control" id="editPhoneField" /></div>
+              <div class="col-md-6"><label class="form-label small fw-medium">Experience</label><input class="form-control" id="editExperience" /></div>
+            </div>
+            <div class="mt-3"><label class="form-label small fw-medium">Address</label><input class="form-control" id="editAddress" /></div>
+            <div class="mt-3"><label class="form-label small fw-medium">Account Status</label>
+              <select class="form-select" id="editStatus"><option>Active</option><option>Inactive</option><option>Offline</option></select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary-vm btn-sm" id="saveEditBtn">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete Caretaker Account</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">Are you sure you want to permanently delete <strong id="delName"></strong>'s account?</p>
+            <p class="text-muted small mb-0">Any patients assigned to this caretaker will become unassigned. This action cannot be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-danger btn-sm" id="confirmDeleteBtn">Delete Permanently</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="section-card">
+      <div class="card-header"><i class="bi bi-shield-fill-check"></i> All Caretakers <span class="badge bg-primary ms-2" id="tableCount">0</span></div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Name</th><th>Zone</th><th>Gender</th><th>Age</th><th>Contact</th><th>Experience</th><th>Assigned Patients</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="ctTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/admin-firestore.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  vmRequireAdmin(); // Admin-only page — view/manage/assign/delete caretakers all gated here.
+  document.getElementById('sidebarMount').innerHTML = PortalLayout.getSidebarHTML('Caretakers');
+  document.getElementById('topbarMount').innerHTML  = PortalLayout.getTopbarHTML('Caretaker Management', 'All registered caretakers across zones — Admin-only management');
+
+  const { zones, caretakers: staticCaretakers, blindUsers } = VM_DATA;
+
+  // Merge: static data + Firestore data
+  let allCaretakers = [...staticCaretakers];
+  let filtered = [...allCaretakers];
+  let firestorePatients = [];
+
+  // Real-time Firestore listener — adds/updates registered caretakers.
+  // Firestore data takes priority over static demo records so admin always
+  // sees real registrations, not stale dummy data (fixes profile sync bug).
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenCaretakers(fsList => {
+      const merged = [...staticCaretakers];
+      fsList.forEach(fc => {
+        const idx = merged.findIndex(c => c.id === fc.firestoreId || c.email === fc.email);
+        const enriched = {
+          id: fc.firestoreId,
+          zoneId: merged[idx]?.zoneId || 'z1',
+          zoneName: fc.zone || merged[idx]?.zoneName || 'Unknown',
+          name: fc.fullName || fc.name || '—',
+          age: fc.age || '—',
+          gender: fc.gender || '—',
+          contact: fc.phone || '—',
+          address: fc.address || '—',
+          experience: fc.experience || '—',
+          qualification: fc.qualification || '—',
+          cnic: fc.cnic || '—',
+          dob: fc.dob || '—',
+          emergencyContact: fc.emergencyContact || '—',
+          status: fc.accountStatus || 'Active',
+          accountStatus: fc.accountStatus || 'Active',
+          hardwareLinked: !!fc.hardwareLinked,
+          lastLoginAt: fc.lastLoginAt,
+          lastLogoutAt: fc.lastLogoutAt,
+          registrationDate: fc.accountCreatedAt,
+          info: 'Registered via portal',
+          fsData: fc,
+          isFirestoreOnly: true
+        };
+        if (idx >= 0) merged[idx] = enriched;
+        else merged.push(enriched);
+      });
+      allCaretakers = merged;
+      applyFilters();
+    });
+    AdminFS.listenPatients(list => { firestorePatients = list; });
+  });
+
+  // Populate zone filter
+  const zf = document.getElementById('zoneFilter');
+  zones.forEach(z => { const o = document.createElement('option'); o.value = z.id; o.textContent = z.name; zf.appendChild(o); });
+
+  function assignedPatientCount(c) {
+    // Avoid double-counting Shahbaz Qureshi, who exists as both a static
+    // demo record (bu_11) and its Firestore-seeded equivalent (pt_shahbaz_1,
+    // legacyId: bu_11). The Firestore record supersedes the static one.
+    const supersededLegacyIds = new Set(firestorePatients.map(p => p.legacyId).filter(Boolean));
+    const staticCount = blindUsers.filter(u => u.caretakerId === c.id && !supersededLegacyIds.has(u.id)).length;
+    const fsCount = firestorePatients.filter(p => p.assignedCaretakerId === c.id).length;
+    return staticCount + fsCount;
+  }
+
+  function render() {
+    const tbody = document.getElementById('ctTable');
+    tbody.innerHTML = filtered.map(c => {
+      const z  = zones.find(z => z.id === c.zoneId);
+      const count = assignedPatientCount(c);
+      const hw = c.hardwareLinked ? hwBadge() : '';
+      const loginInfo = c.lastLoginAt && c.lastLoginAt !== '—' ? `<small class="text-muted d-block" style="font-size:0.7rem">Login: ${c.lastLoginAt}</small>` : '';
+      const statusLabel = c.accountStatus || c.status;
+      const deletable = c.isFirestoreOnly; // Only real registered accounts can be deleted (static demo records are not real accounts)
+      return `<tr>
+        <td><strong>${c.name}</strong>${hw}</td>
+        <td><span class="badge" style="background:${z?.color||'#888'}20;color:${z?.color||'#888'}">${c.zoneName||c.zone||'—'}</span></td>
+        <td>${c.gender}</td><td>${c.age}</td><td>${c.contact||c.phone||'—'}</td><td>${c.experience}</td>
+        <td><span class="badge bg-primary bg-opacity-10 text-primary">${count}</span></td>
+        <td>${statusBadge(statusLabel)}${loginInfo}</td>
+        <td class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-primary" onclick="showProfile('${c.id}')" title="View Profile"><i class="bi bi-eye-fill"></i></button>
+          ${deletable ? `<button class="btn btn-sm btn-outline-danger" onclick="confirmDelete('${c.id}','${c.name.replace(/'/g, "\\'")}')" title="Delete Account"><i class="bi bi-trash-fill"></i></button>` : ''}
+        </td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="9" class="text-center text-muted py-4">No caretakers found.</td></tr>';
+    document.getElementById('tableCount').textContent = filtered.length;
+    document.getElementById('countLabel').textContent = `Showing ${filtered.length} of ${allCaretakers.length}`;
+  }
+
+  function applyFilters() {
+    const q  = document.getElementById('ctSearch').value.toLowerCase();
+    const z  = document.getElementById('zoneFilter').value;
+    const st = document.getElementById('statusFilter').value;
+    filtered = allCaretakers.filter(c =>
+      (!q || (c.name||'').toLowerCase().includes(q) || (c.zoneName||c.zone||'').toLowerCase().includes(q) || (c.gender||'').toLowerCase().includes(q)) &&
+      (!z || c.zoneId === z) &&
+      (!st || (c.accountStatus||c.status) === st)
+    );
+    render();
+  }
+
+  document.getElementById('ctSearch').addEventListener('input', applyFilters);
+  document.getElementById('zoneFilter').addEventListener('change', applyFilters);
+  document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+  const modal = new bootstrap.Modal(document.getElementById('ctModal'));
+  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+  function showProfile(id) {
+    const c  = allCaretakers.find(c => c.id === id);
+    if (!c) return;
+    const z  = zones.find(z => z.id === c.zoneId);
+    const count = assignedPatientCount(c);
+    const supersededLegacyIds = new Set(firestorePatients.map(p => p.legacyId).filter(Boolean));
+    const staticBu = blindUsers.filter(u => u.caretakerId === id && !supersededLegacyIds.has(u.id));
+    const fsBu = firestorePatients.filter(p => p.assignedCaretakerId === id);
+    const hw = c.hardwareLinked ? `<div class="alert alert-warning py-2 px-3 d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-cpu-fill"></i><strong>Dedicated Hardware-Monitoring Account</strong> — Connected to live sensor monitoring module.
+    </div>` : '';
+    const fsInfo = c.fsData ? `
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">CNIC</div><div class="fw-medium">${c.fsData?.cnic||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Date of Birth</div><div class="fw-medium">${c.fsData?.dob||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Last Login</div><div class="fw-medium">${c.lastLoginAt||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Last Logout</div><div class="fw-medium">${c.lastLogoutAt||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Registration Date</div><div class="fw-medium">${c.registrationDate||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Account Status</div><div class="fw-medium">${c.accountStatus||c.status}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Qualification</div><div class="fw-medium">${c.fsData?.qualification||c.qualification||'—'}</div></div></div>
+      <div class="col-md-6"><div class="step-card"><div class="text-muted small">Emergency Contact</div><div class="fw-medium">${c.fsData?.emergencyContact||'—'}</div></div></div>
+    ` : '';
+    document.getElementById('ctModalBody').innerHTML = `
+      ${hw}
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="user-pill-avatar" style="width:64px;height:64px;font-size:1.4rem;background:var(--gradient-btn)">${getInitial(c.name)}</div>
+        <div>
+          <h5 class="mb-0">${c.name}</h5>
+          <div class="text-muted small">${c.zoneName||c.zone||'—'} • ${c.gender} • ${c.age} years</div>
+          ${statusBadge(c.accountStatus||c.status)}
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Contact</div><div class="fw-medium">${c.contact||c.phone||'—'}</div></div></div>
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Experience</div><div class="fw-medium">${c.experience}</div></div></div>
+        <div class="col-12"><div class="step-card"><div class="text-muted small">Address</div><div class="fw-medium">${c.address}</div></div></div>
+        ${fsInfo}
+        <div class="col-12"><div class="step-card"><div class="text-muted small">Additional Information</div><div>${c.info||'—'}</div></div></div>
+        <div class="col-12">
+          <div class="step-card">
+            <div class="text-muted small mb-2">Assigned Patients (${count})</div>
+            ${staticBu.length || fsBu.length ? [...staticBu.map(u => `<div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge bg-primary bg-opacity-10 text-primary">${u.name}</span>
+              <span class="text-muted small">${u.gender}, ${u.age}</span>
+              ${monBadge(u.monitoringStatus)}
+              ${u.hardwareLinked ? hwBadge() : ''}
+            </div>`), ...fsBu.map(p => `<div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge bg-primary bg-opacity-10 text-primary">${p.patientName}</span>
+              <span class="text-muted small">${p.gender||''}, ${p.age||''}</span>
+              ${monBadge(p.monitoringStatus)}
+            </div>`)].join('') : '<span class="text-muted">None assigned</span>'}
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('ctViewUsersLink').href = `patients.html?ct=${id}`;
+
+    // Edit button wiring
+    document.getElementById('ctEditBtn').onclick = () => { modal.hide(); openEdit(c); };
+    // Delete button wiring (admin-only — disabled for static demo records)
+    const delBtn = document.getElementById('ctDeleteBtn');
+    if (c.isFirestoreOnly) {
+      delBtn.disabled = false;
+      delBtn.title = '';
+      delBtn.onclick = () => { modal.hide(); confirmDelete(c.id, c.name); };
+    } else {
+      delBtn.disabled = true;
+      delBtn.title = 'Static demo records cannot be deleted';
+      delBtn.onclick = null;
+    }
+    modal.show();
+  }
+
+  function openEdit(c) {
+    document.getElementById('editId').value = c.id;
+    document.getElementById('editFullName').value = c.name || '';
+    document.getElementById('editPhoneField').value = c.contact || c.phone || '';
+    document.getElementById('editExperience').value = c.experience || '';
+    document.getElementById('editAddress').value = c.address || '';
+    document.getElementById('editStatus').value = c.accountStatus || c.status || 'Active';
+    editModal.show();
+  }
+
+  document.getElementById('saveEditBtn').addEventListener('click', async () => {
+    const id = document.getElementById('editId').value;
+    const c = allCaretakers.find(c => c.id === id);
+    if (!c || !c.isFirestoreOnly) {
+      alert('Static demo records are not stored in Firestore and cannot be edited.');
+      editModal.hide();
+      return;
+    }
+    const data = {
+      fullName: document.getElementById('editFullName').value.trim(),
+      phone: document.getElementById('editPhoneField').value.trim(),
+      experience: document.getElementById('editExperience').value.trim(),
+      address: document.getElementById('editAddress').value.trim(),
+      accountStatus: document.getElementById('editStatus').value
+    };
+    try {
+      await AdminFS.updateCaretaker(id, data);
+      editModal.hide();
+    } catch (e) {
+      alert('Could not save changes: ' + e.message);
+    }
+  });
+
+  function confirmDelete(id, name) {
+    document.getElementById('delName').textContent = name;
+    document.getElementById('confirmDeleteBtn').onclick = async () => {
+      try {
+        await AdminFS.deleteCaretaker(id);
+        deleteModal.hide();
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    };
+    deleteModal.show();
+  }
+  window.showProfile = showProfile;
+  window.confirmDelete = confirmDelete;
+
+  // URL param
+  const urlCt = new URLSearchParams(location.search).get('ct');
+  if (urlCt) { render(); setTimeout(() => showProfile(urlCt), 300); }
+
+  render();
+</script>
+</body>
+</html>

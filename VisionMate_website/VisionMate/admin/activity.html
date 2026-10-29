@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications & Activity – VisionMate Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="bi bi-people-fill"></i></div>
+          <div><p class="stat-label">Registered Caretakers</p><p class="stat-value" id="stTotal">—</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="border-color:#D1FAE5;background:#F0FDF4">
+          <div class="stat-icon green"><i class="bi bi-wifi"></i></div>
+          <div><p class="stat-label">Online</p><p class="stat-value" id="stOnline">—</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon slate"><i class="bi bi-wifi-off"></i></div>
+          <div><p class="stat-label">Offline</p><p class="stat-value" id="stOffline">—</p></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon purple"><i class="bi bi-clock-history"></i></div>
+          <div><p class="stat-label">Activity Events</p><p class="stat-value" id="stEvents">—</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Emergency Notifications Panel -->
+    <div class="section-card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bell-fill text-danger"></i> Live Emergency Notifications <span class="badge bg-danger ms-2" id="adminNotifCount">0</span></span>
+        <div class="d-flex gap-2 flex-wrap">
+          <select id="adminNotifFilter" class="form-select form-select-sm" style="width:auto" onchange="filterAdminNotifs(this.value)">
+            <option value="all">All Types</option>
+            <option value="emergency">Emergency</option>
+            <option value="hardware">Hardware</option>
+            <option value="assignment">Assignment</option>
+            <option value="system">System</option>
+          </select>
+          <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="markAllAdminRead()">
+            <i class="bi bi-check-all me-1"></i>Mark all read
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div id="adminNotifList" style="max-height:400px;overflow-y:auto;padding:.75rem">
+          <div class="text-muted small text-center py-4">
+            <div class="spinner-border spinner-border-sm me-2"></div>Loading notifications…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History (Login, Logout & Signup) -->
+    <div class="section-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history"></i> History <span class="badge bg-primary ms-2" id="histCount">0</span></span>
+        <input type="search" id="histSearch" class="form-control form-control-sm" placeholder="Search by name…" style="max-width:220px" />
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="histTable">
+            <thead class="table-light">
+              <tr>
+                <th>Type</th>
+                <th>Caretaker Name</th>
+                <th>Email</th>
+                <th>Zone</th>
+                <th>Date &amp; Time</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="histTableBody">
+              <tr><td colspan="6" class="text-center text-muted py-4">
+                <div class="spinner-border spinner-border-sm me-2"></div>Loading history…
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/admin-firestore.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  vmRequireAdmin();
+  document.getElementById('sidebarMount').innerHTML = PortalLayout.getSidebarHTML('Settings');
+  document.getElementById('topbarMount').innerHTML  = PortalLayout.getTopbarHTML('Login Activity', 'Real-time caretaker login & activity tracking');
+
+  let allData = [];
+
+  // ── Admin Live Notifications ──────────────────────────────────
+  // Reads the same 'notifications' collection used by caretakers.
+  // Admin sees ALL notifications (any caretakerId).
+  const TYPE_CFG = {
+    emergency: { icon:'bi-exclamation-triangle-fill', color:'#DC2626',  bg:'#FEF2F2', border:'#FECACA'  },
+    hardware:  { icon:'bi-cpu-fill',                  color:'#5B3FE8',  bg:'#EDE9FF', border:'#C4B5FD'  },
+    assignment:{ icon:'bi-person-fill',               color:'#0EA5E9',  bg:'#EFF6FF', border:'#BFDBFE'  },
+    system:    { icon:'bi-check-circle-fill',         color:'#22C55E',  bg:null,      border:null        },
+    weather:   { icon:'bi-cloud-rain-fill',           color:'#DC2626',  bg:'#FEF2F2', border:'#FECACA'  }
+  };
+  let adminNotifs = [];
+  let adminFilter = 'all';
+
+  function timeAgoAdmin(date) {
+    const s = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (s < 60) return 'Just now';
+    if (s < 3600) return Math.floor(s/60) + ' min ago';
+    if (s < 86400) return Math.floor(s/3600) + ' hr ago';
+    return Math.floor(s/86400) + ' day(s) ago';
+  }
+
+  function renderAdminNotifs() {
+    const list = adminFilter === 'all' ? adminNotifs
+      : adminNotifs.filter(n => n.type === adminFilter);
+    document.getElementById('adminNotifCount').textContent = adminNotifs.filter(n => !n.read).length;
+    if (!list.length) {
+      document.getElementById('adminNotifList').innerHTML =
+        '<div class="text-muted small text-center py-4">No notifications yet.</div>';
+      return;
+    }
+    document.getElementById('adminNotifList').innerHTML = list.map(n => {
+      const cfg = TYPE_CFG[n.type] || TYPE_CFG.system;
+      const ts = n.createdAtDate || new Date();
+      const fullDate = ts.toLocaleDateString('en-PK', {year:'numeric',month:'short',day:'numeric'});
+      const fullTime = ts.toLocaleTimeString('en-PK', {hour:'2-digit',minute:'2-digit'});
+      const metaParts = [];
+      if (n.triggeredBy) metaParts.push(`<strong>By:</strong> ${n.triggeredBy}`);
+      if (n.patientName) metaParts.push(`<i class="bi bi-person-fill me-1"></i>${n.patientName}`);
+      if (n.status)      metaParts.push(`${n.status}`);
+      if (n.contactName) metaParts.push(`<i class="bi bi-telephone-fill me-1"></i>${n.contactName}${n.contactNumber ? ' ('+n.contactNumber+')' : ''}`);
+      return `
+      <div class="d-flex align-items-start gap-3 py-2 border-bottom" style="opacity:${n.read?'0.6':'1'}">
+        <div style="width:36px;height:36px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;
+          background:${cfg.bg||'#F1F5F9'};color:${cfg.color}">
+          <i class="bi ${cfg.icon}"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="fw-semibold small">${n.title} ${!n.read?'<span class="badge bg-danger ms-1" style="font-size:.6rem">NEW</span>':''}</div>
+            <div class="text-muted" style="font-size:.68rem;white-space:nowrap;margin-left:.5rem">${timeAgoAdmin(ts)}</div>
+          </div>
+          <div class="text-muted small">${n.body||''}</div>
+          ${metaParts.length ? '<div class="d-flex flex-wrap gap-2 mt-1" style="font-size:.7rem;color:#64748B">'+metaParts.map(p=>'<span>'+p+'</span>').join('')+'</div>' : ''}
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <div class="d-flex gap-3" style="font-size:.67rem;color:#94A3B8">
+              <span><i class="bi bi-calendar3 me-1"></i>${fullDate}</span>
+              <span><i class="bi bi-clock me-1"></i>${fullTime}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.68rem" onclick="deleteAdminNotif('${n.firestoreId}')" title="Delete permanently">
+              <i class="bi bi-trash-fill"></i>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function deleteAdminNotif(firestoreId) {
+    if (!confirm('Permanently delete this notification? This cannot be undone.')) return;
+    try {
+      await AdminFS.deleteNotification(firestoreId);
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
+  }
+  window.deleteAdminNotif = deleteAdminNotif;
+
+  function filterAdminNotifs(val) {
+    adminFilter = val;
+    renderAdminNotifs();
+  }
+  window.filterAdminNotifs = filterAdminNotifs;
+
+  async function markAllAdminRead() {
+    // Admin mark-all-read: update all unread docs
+    try {
+      const { getFirestore, collection, query, where, getDocs, writeBatch, doc }
+        = await import('https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js');
+      const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js');
+      const cfg = { apiKey:"AIzaSyD6jVwkx113T305BJZoEOSrI8BcKocUOFQ", authDomain:"visionmatefinal.firebaseapp.com",
+        projectId:"visionmatefinal", storageBucket:"visionmatefinal.firebasestorage.app",
+        messagingSenderId:"146422566914", appId:"1:146422566914:web:18cf57faa13a38825b571b" };
+      const app = getApps().find(a => a.name==='vm-auth') || initializeApp(cfg,'vm-auth');
+      const db2 = getFirestore(app);
+      const q = query(collection(db2,'notifications'), where('read','==',false));
+      const qs = await getDocs(q);
+      const batch = writeBatch(db2);
+      qs.docs.forEach(d => batch.update(d.ref, {read:true}));
+      await batch.commit();
+    } catch(e) { console.warn('[Admin] mark-all-read failed:', e); }
+  }
+  window.markAllAdminRead = markAllAdminRead;
+
+  // Real-time listener for ALL notifications (admin-wide)
+  document.addEventListener('vm:adminfs-ready', () => {
+    // Use admin-firestore db (same Firebase project)
+    import('https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js').then(
+      ({ getFirestore, collection, query, orderBy, onSnapshot, limit }) => {
+        import('https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js').then(
+          ({ initializeApp, getApps }) => {
+            const cfg = { apiKey:"AIzaSyD6jVwkx113T305BJZoEOSrI8BcKocUOFQ", authDomain:"visionmatefinal.firebaseapp.com",
+              projectId:"visionmatefinal", storageBucket:"visionmatefinal.firebasestorage.app",
+              messagingSenderId:"146422566914", appId:"1:146422566914:web:18cf57faa13a38825b571b" };
+            const app = getApps().find(a => a.name==='vm-auth') || initializeApp(cfg,'vm-auth');
+            const db2 = getFirestore(app);
+            const q = query(collection(db2,'notifications'), orderBy('createdAt','desc'), limit(100));
+            onSnapshot(q, snap => {
+              adminNotifs = snap.docs.map(d => {
+                const data = d.data();
+                return { firestoreId: d.id, ...data,
+                  createdAtDate: data.createdAt?.toDate ? data.createdAt.toDate() : new Date() };
+              });
+              renderAdminNotifs();
+            }, err => console.warn('[Admin] Notification listener error:', err));
+          });
+      });
+  });
+
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenCaretakers(fsList => {
+      allData = fsList;
+      const online  = fsList.filter(f => f.accountStatus === 'Active').length;
+      const offline = fsList.filter(f => f.accountStatus === 'Offline').length;
+      document.getElementById('stTotal').textContent  = fsList.length;
+      document.getElementById('stOnline').textContent = online;
+      document.getElementById('stOffline').textContent = offline;
+      document.getElementById('stEvents').textContent = fsList.filter(f => f.lastLoginAt && f.lastLoginAt !== '—').length;
+    });
+  });
+
+  // ── History: Login, Logout & Signup (auth_history collection) ──
+  let allHistory = [];
+
+  function typeBadge(t) {
+    if (t === 'signup') return '<span class="badge bg-info text-dark">Signup</span>';
+    if (t === 'login')  return '<span class="badge bg-success">Login</span>';
+    if (t === 'logout') return '<span class="badge bg-secondary">Logout</span>';
+    return `<span class="badge bg-secondary">${t||'—'}</span>`;
+  }
+
+  function renderHistory(data) {
+    const tbody = document.getElementById('histTableBody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No history records found.</td></tr>';
+      document.getElementById('histCount').textContent = 0;
+      return;
+    }
+    tbody.innerHTML = data.map(h => `
+      <tr>
+        <td>${typeBadge(h.type)}</td>
+        <td><strong>${h.fullName||'—'}</strong></td>
+        <td><small class="text-muted">${h.email||'—'}</small></td>
+        <td>${h.zone||'—'}</td>
+        <td><small>${(h.createdAtDate||new Date()).toLocaleString('en-PK')}</small></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteHistoryRecord('${h.firestoreId}')" title="Delete permanently">
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+    document.getElementById('histCount').textContent = data.length;
+  }
+
+  async function deleteHistoryRecord(firestoreId) {
+    if (!confirm('Permanently delete this history record? This cannot be undone.')) return;
+    try {
+      await AdminFS.deleteAuthHistoryRecord(firestoreId);
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
+  }
+  window.deleteHistoryRecord = deleteHistoryRecord;
+
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenAuthHistory(list => {
+      allHistory = list; // already newest-first via orderBy('createdAt','desc')
+      const q = (document.getElementById('histSearch').value || '').toLowerCase();
+      renderHistory(q ? allHistory.filter(h => (h.fullName||'').toLowerCase().includes(q) || (h.email||'').toLowerCase().includes(q)) : allHistory);
+    });
+  });
+
+  document.getElementById('histSearch').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderHistory(allHistory.filter(h => (h.fullName||'').toLowerCase().includes(q) || (h.email||'').toLowerCase().includes(q)));
+  });
+</script>
+</body>
+</html>

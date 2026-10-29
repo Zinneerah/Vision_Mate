@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications – VisionMate User</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+  <style>
+    .notif-item { transition: opacity .2s, background .2s; }
+    .notif-item:hover { background: #F8FAFC !important; cursor: pointer; }
+  </style>
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div>
+        <h4 class="fw-bold mb-1">Notifications</h4>
+        <p class="text-muted mb-0">Real-time emergency alerts, hardware events and system notifications</p>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="markAllRead()">
+        <i class="bi bi-check-all me-1"></i>Mark all read
+      </button>
+      <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="clearAllNotifs()">
+        <i class="bi bi-trash me-1"></i>Clear all
+      </button>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="d-flex gap-2 mb-4 flex-wrap" id="filterBar">
+      <button class="btn btn-sm btn-primary rounded-pill" onclick="filterNotif('all',this)">All</button>
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterNotif('emergency',this)">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>Emergency
+      </button>
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterNotif('hardware',this)">
+        <i class="bi bi-cpu-fill me-1"></i>Hardware
+      </button>
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterNotif('weather',this)">
+        <i class="bi bi-cloud-rain-fill me-1"></i>Weather
+      </button>
+      <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterNotif('system',this)">
+        <i class="bi bi-gear-fill me-1"></i>System
+      </button>
+    </div>
+
+    <!-- Count badge -->
+    <div class="mb-3" id="countBadgeRow" style="display:none">
+      <span class="badge bg-primary rounded-pill" id="countBadge">0 notifications</span>
+      <span class="badge bg-danger rounded-pill ms-2" id="unreadBadge" style="display:none">0 unread</span>
+    </div>
+
+    <div id="notifContainer">
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-bell fs-1 d-block mb-2 text-muted opacity-25"></i>
+        Loading notifications…
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/firebase-auth.js"></script>
+<script src="../js/user-layout.js"></script>
+<script>
+  const session = vmRequireUser();
+  document.getElementById('sidebarMount').innerHTML = UserLayout.getSidebarHTML('Notifications', session);
+  document.getElementById('topbarMount').innerHTML  = UserLayout.getTopbarHTML('Notifications', 'Real-time alerts and system messages', session);
+
+  // ── Type config: icon / color / display label ────────────────
+  const TYPE_CONFIG = {
+    emergency: { icon:'bi-exclamation-triangle-fill', color:'danger',  bg:'#FEF2F2', border:'#FECACA',  label:'Emergency'  },
+    hardware:  { icon:'bi-cpu-fill',                  color:'primary', bg:'#EDE9FF', border:'#C4B5FD',  label:'Hardware'   },
+    weather:   { icon:'bi-cloud-rain-fill',           color:'danger',  bg:'#FEF2F2', border:'#FECACA',  label:'Weather'    },
+    assignment:{ icon:'bi-person-fill',               color:'primary', bg:null,      border:null,       label:'Assignment' },
+    patient:   { icon:'bi-person-lines-fill',         color:'primary', bg:null,      border:null,       label:'Patient'    },
+    reminder:  { icon:'bi-capsule-fill',              color:'warning', bg:'#FFFBEB', border:'#FDE68A',  label:'Reminder'   },
+    system:    { icon:'bi-check-circle-fill',         color:'success', bg:null,      border:null,       label:'System'     }
+  };
+
+  // Which filter tab matches which event types
+  // 'all' always shows everything
+  const TAB_TYPES = {
+    emergency: ['emergency'],
+    hardware:  ['hardware'],
+    message:   ['message'],
+    weather:   ['weather'],
+    system:    ['system', 'assignment', 'patient', 'reminder']
+  };
+
+  let allNotifs = [];
+  let currentFilter = 'all';
+
+  // ── Render ────────────────────────────────────────────────────
+  function renderNotifs() {
+    const list = currentFilter === 'all'
+      ? allNotifs
+      : allNotifs.filter(n => (TAB_TYPES[currentFilter] || []).includes(n.type || 'system'));
+
+    // Update count badges
+    const unread = allNotifs.filter(n => !n.read).length;
+    document.getElementById('countBadgeRow').style.display = allNotifs.length ? '' : 'none';
+    document.getElementById('countBadge').textContent = list.length + ' notification' + (list.length !== 1 ? 's' : '');
+    const unreadBadge = document.getElementById('unreadBadge');
+    if (unread > 0) {
+      unreadBadge.style.display = '';
+      unreadBadge.textContent = unread + ' unread';
+    } else {
+      unreadBadge.style.display = 'none';
+    }
+
+    if (!list.length) {
+      document.getElementById('notifContainer').innerHTML =
+        `<div class="text-center text-muted py-5">
+           <i class="bi bi-bell-slash fs-1 d-block mb-2 opacity-25"></i>
+           <div>${currentFilter === 'all' ? 'No notifications yet. Events will appear here in real time.' : 'No ' + currentFilter + ' notifications yet.'}</div>
+         </div>`;
+      return;
+    }
+
+    document.getElementById('notifContainer').innerHTML = list.map(n => {
+      const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.system;
+      const ts = n.createdAtDate || new Date();
+      const timeAgoStr = timeAgo(ts);
+      const fullDate = ts.toLocaleDateString('en-PK', { year:'numeric', month:'short', day:'numeric' });
+      const fullTime = ts.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit' });
+
+      // Meta row: patient, triggeredBy, status, contact
+      const metaParts = [];
+      if (n.triggeredBy) metaParts.push(`<span><i class="bi bi-arrow-right-circle-fill me-1" style="color:#7C3AED"></i><strong>Triggered by:</strong> ${n.triggeredBy}</span>`);
+      if (n.patientName) metaParts.push(`<span><i class="bi bi-person-fill text-primary me-1"></i>${n.patientName}</span>`);
+      if (n.status)      metaParts.push(`<span><i class="bi bi-circle-fill me-1" style="font-size:.5rem;color:var(--success)"></i>${n.status}</span>`);
+      if (n.contactName) metaParts.push(`<span><i class="bi bi-telephone-fill me-1"></i>${n.contactName}${n.contactNumber ? ' (' + n.contactNumber + ')' : ''}</span>`);
+      const metaHtml = metaParts.length
+        ? `<div class="d-flex flex-wrap gap-3 mt-1" style="font-size:.7rem;color:#64748B">${metaParts.join('')}</div>`
+        : '';
+
+      return `
+      <div class="notif-item mb-2" data-id="${n.firestoreId}" style="
+        border:1px solid ${cfg.border || 'var(--card-border)'};
+        background:${n.read ? '#FAFAFA' : (cfg.bg || '#fff')};
+        border-radius:.75rem; padding:1rem 1.25rem;
+        opacity:${n.read ? '0.7' : '1'};
+      " onclick="markOneRead('${n.firestoreId}',this)">
+        <div class="d-flex align-items-start gap-3">
+          <div style="width:40px;height:40px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;
+            background:${cfg.bg || '#F1F5F9'};color:var(--${cfg.color},var(--primary))">
+            <i class="bi ${cfg.icon}"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+              <div class="fw-semibold small">
+                ${n.title}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1" style="font-size:.6rem">${cfg.label}</span>
+                ${!n.read ? '<span class="badge bg-danger ms-1" style="font-size:.6rem">NEW</span>' : ''}
+              </div>
+              <div class="text-muted" style="font-size:.7rem;white-space:nowrap" title="${fullDate} at ${fullTime}">${timeAgoStr}</div>
+            </div>
+            <div class="text-muted small mt-1">${n.body || ''}</div>
+            ${metaHtml}
+            <div class="d-flex gap-3 mt-2" style="font-size:.68rem;color:#94A3B8">
+              <span><i class="bi bi-calendar3 me-1"></i>${fullDate}</span>
+              <span><i class="bi bi-clock me-1"></i>${fullTime}</span>
+              <button class="btn btn-sm ms-auto p-0" style="font-size:.68rem;color:#94A3B8;border:none;background:none" onclick="event.stopPropagation();deleteOneNotif('${n.firestoreId}',this.closest('.notif-item'))" title="Delete notification">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function timeAgo(date) {
+    const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (secs < 60)    return 'Just now';
+    if (secs < 3600)  return Math.floor(secs/60) + ' min ago';
+    if (secs < 86400) return Math.floor(secs/3600) + ' hr ago';
+    return Math.floor(secs/86400) + ' day' + (Math.floor(secs/86400) === 1 ? '' : 's') + ' ago';
+  }
+
+  function filterNotif(type, btn) {
+    currentFilter = type;
+    document.querySelectorAll('#filterBar .btn').forEach(b => {
+      b.className = 'btn btn-sm btn-outline-secondary rounded-pill';
+    });
+    btn.className = 'btn btn-sm btn-primary rounded-pill';
+    renderNotifs();
+  }
+
+  async function markOneRead(id, el) {
+    try {
+      await VmAuth.markNotificationRead(id);
+      el.style.opacity = '0.7';
+      // Update local state immediately
+      const n = allNotifs.find(x => x.firestoreId === id);
+      if (n) n.read = true;
+      renderNotifs();
+    } catch(e) { /* ignore */ }
+  }
+  window.markOneRead = markOneRead;
+
+  async function clearAllNotifs() {
+    if (!confirm('Clear all notifications? This cannot be undone.')) return;
+    try {
+      await VmAuth.clearAllNotifications(session.id);
+    } catch(e) { console.warn('[VisionMate] Clear all failed:', e); }
+  }
+  window.clearAllNotifs = clearAllNotifs;
+
+  async function deleteOneNotif(id, el) {
+    try {
+      await VmAuth.deleteNotification(id);
+      if (el) el.style.display = 'none';
+      allNotifs = allNotifs.filter(n => n.firestoreId !== id);
+      renderNotifs();
+    } catch(e) { console.warn('[VisionMate] Delete notification failed:', e); }
+  }
+  window.deleteOneNotif = deleteOneNotif;
+
+  async function markAllRead() {
+    try {
+      await VmAuth.markAllNotificationsRead(session.id);
+    } catch(e) { console.warn('[VisionMate] Mark-all-read failed:', e); }
+  }
+  window.markAllRead = markAllRead;
+  window.filterNotif = filterNotif;
+
+  // ── Real-time listener ────────────────────────────────────────
+  // Starts as soon as firebase-auth.js fires vm:auth-ready.
+  // Uses session.id which is the Firestore document ID for this caretaker
+  // (either their Firebase Auth UID or 'ct_z4_1' for Ahmed Nawaz).
+  document.addEventListener('vm:auth-ready', () => {
+    VmAuth.listenNotifications(session.id, list => {
+      allNotifs = list;
+      renderNotifs();
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login – VisionMate</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+  <style>
+    html, body { height: 100%; }
+    .login-panel {
+      min-height: 100vh;
+      background: var(--gradient-hero);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .login-visual {
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+      padding: 2rem 3rem 2rem 2rem;
+      color: #fff;
+      height: 100%;
+    }
+    .feature-bullet { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.9rem; color:rgba(255,255,255,0.75); font-size:0.86rem; }
+    .feature-bullet-dot { width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0; }
+
+    /* Card sits centered and matched in height to the visual panel */
+    .form-card {
+      background:#fff;
+      border-radius:1.25rem;
+      padding:1.75rem 2rem;
+      box-shadow:0 24px 64px rgba(0,0,0,0.35);
+      width:100%;
+      max-width:440px;
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+    }
+    .form-card::-webkit-scrollbar { width: 6px; }
+    .form-card::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 3px; }
+
+    .tab-btn { flex:1; padding:0.55rem; border:none; background:transparent; border-radius:0.6rem; font-size:0.86rem; font-weight:600; color:var(--text-sub); transition:all 0.2s; cursor:pointer; }
+    .tab-btn.active { background:var(--gradient-btn); color:#fff; box-shadow:0 2px 8px rgba(91,63,232,0.3); }
+    .tab-container { background:#F1F5F9; border-radius:0.75rem; display:flex; padding:0.25rem; margin-bottom:1.1rem; flex-shrink: 0; }
+
+    .form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:0.65rem; }
+    @media(max-width:480px){ .form-row-2{ grid-template-columns:1fr; } }
+
+    .admin-access-link {
+      font-size: 0.75rem;
+      color: var(--text-sub, #94A3B8);
+      text-decoration: none;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .admin-access-link:hover { opacity: 1; color: var(--text-sub, #94A3B8); text-decoration: underline; }
+
+    /* Compact field groups */
+    .field-group { margin-bottom: 0.65rem; }
+    .field-group .form-label { margin-bottom: 0.25rem; }
+    .form-label.small { font-size: 0.78rem; }
+
+    /* Wizard progress indicator */
+    .wizard-progress { flex-shrink: 0; margin-bottom: 1rem; }
+    .progress-track { display: flex; align-items: center; }
+    .step-circle {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: #E2E8F0; color: #94A3B8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+    .step-circle.active { background: var(--gradient-btn); color: #fff; box-shadow: 0 2px 8px rgba(91,63,232,0.35); }
+    .step-circle.completed { background: var(--primary, #5B3FE8); color: #fff; }
+    .step-line { flex: 1; height: 3px; background: #E2E8F0; margin: 0 6px; border-radius: 2px; transition: background 0.3s ease; }
+    .step-line.completed { background: var(--primary, #5B3FE8); }
+    .progress-labels { display: flex; justify-content: space-between; margin-top: 6px; }
+    .progress-labels span { flex: 1; font-size: 0.72rem; font-weight: 600; color: #94A3B8; transition: color 0.25s ease; }
+    .progress-labels span:nth-child(2) { text-align: center; }
+    .progress-labels span:last-child { text-align: right; }
+    .progress-labels span.active { color: var(--primary, #5B3FE8); }
+
+    /* Wizard steps */
+    .wizard-step { animation: stepFade 0.25s ease; }
+    @keyframes stepFade {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .wizard-nav { display: flex; gap: 0.6rem; margin-top: 0.4rem; flex-shrink: 0; }
+    .wizard-nav .btn { flex: 1; }
+
+    #signupForm { display: none; flex-direction: column; flex: 1; min-height: 0; }
+    #loginForm { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="login-panel">
+  <div class="w-100" style="max-width:900px">
+    <div class="row g-0 align-items-stretch">
+
+      <!-- Left visual (desktop) -->
+      <div class="col-md-5 d-none d-md-block">
+        <div class="login-visual">
+          <div class="mb-4">
+            <img src="../logo.png" alt="VisionMate" style="width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(6,182,212,0.5))" />
+            <h2 class="text-white fw-bold mt-2 mb-0">VisionMate</h2>
+            <p style="color:rgba(255,255,255,0.5);font-size:0.8rem">Smart Assistance &amp; Safety Platform</p>
+          </div>
+          <div class="feature-bullet">
+            <div class="feature-bullet-dot" style="background:rgba(6,182,212,0.2)"><i class="bi bi-eye-fill" style="color:var(--accent)"></i></div>
+            <span>Monitor your assigned patients</span>
+          </div>
+          <div class="feature-bullet">
+            <div class="feature-bullet-dot" style="background:rgba(91,63,232,0.2)"><i class="bi bi-cpu-fill" style="color:var(--primary)"></i></div>
+            <span>Live hardware sensor integration</span>
+          </div>
+          <div class="feature-bullet">
+            <div class="feature-bullet-dot" style="background:rgba(239,68,68,0.2)"><i class="bi bi-bell-fill" style="color:var(--danger)"></i></div>
+            <span>Instant emergency alerts</span>
+          </div>
+          <div class="feature-bullet">
+            <div class="feature-bullet-dot" style="background:rgba(34,197,94,0.2)"><i class="bi bi-geo-alt-fill" style="color:var(--success)"></i></div>
+            <span>Location &amp; vitals monitoring</span>
+          </div>
+          <div class="mt-3">
+            <a href="../index.html" class="text-decoration-none" style="color:rgba(255,255,255,0.4);font-size:0.8rem">
+              <i class="bi bi-arrow-left me-1"></i>Back to Home
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right form card -->
+      <div class="col-md-7 d-flex justify-content-center justify-content-md-end align-items-center">
+        <div class="form-card">
+          <!-- Mobile back -->
+          <div class="d-md-none mb-3 text-center flex-shrink-0">
+            <img src="../logo.png" alt="VisionMate" style="width:44px;height:44px;object-fit:contain" />
+            <h4 class="fw-bold mt-1 mb-0" style="background:var(--gradient-btn);-webkit-background-clip:text;-webkit-text-fill-color:transparent">VisionMate</h4>
+          </div>
+
+          <!-- Tab switcher -->
+          <div class="tab-container">
+            <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+            <button class="tab-btn" id="tabSignup" onclick="switchTab('signup')">Sign Up</button>
+          </div>
+
+          <!-- Error / success alerts -->
+          <div id="errorAlert" class="alert alert-danger d-none align-items-center gap-2 mb-3 py-2 px-3 flex-shrink-0" style="font-size:0.83rem">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            <span id="errorMsg"></span>
+          </div>
+          <div id="successAlert" class="alert alert-success d-none align-items-center gap-2 mb-3 py-2 px-3 flex-shrink-0" style="font-size:0.83rem">
+            <i class="bi bi-check-circle-fill"></i>
+            <span id="successMsg"></span>
+          </div>
+
+          <!-- ═══════════════ LOGIN FORM ═══════════════ -->
+          <div id="loginForm">
+            <div class="field-group">
+              <label class="form-label small fw-medium">Email Address</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
+                <input type="email" id="loginEmail" class="form-control bg-light border-start-0" placeholder="your@email.com" />
+              </div>
+            </div>
+            <div class="field-group mb-3">
+              <label class="form-label small fw-medium">Password</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                <input type="password" id="loginPwd" class="form-control bg-light border-start-0 border-end-0" placeholder="Enter password" />
+                <button type="button" class="btn btn-outline-secondary border-start-0 bg-light" onclick="togglePwd('loginPwd','loginPwdIcon')">
+                  <i class="bi bi-eye" id="loginPwdIcon"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Demo hint -->
+            <div class="mb-3 p-2 rounded-2 border" style="background:#F8FAFC;font-size:0.77rem">
+              <div class="fw-semibold text-muted mb-1"><i class="bi bi-info-circle me-1"></i>Demo Accounts</div>
+              <div>ahmed@visionmate.com / user123 <span class="badge bg-warning text-dark ms-1">HW Live</span></div>
+            </div>
+
+            <button class="btn btn-primary-vm w-100 py-2 fw-semibold rounded-3" id="loginBtn" onclick="handleLogin()">
+              <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+            </button>
+
+            <div class="text-center mt-3">
+              <a href="../admin/login.html" class="admin-access-link">Administrator Access</a>
+            </div>
+          </div>
+
+          <!-- ═══════════════ SIGNUP FORM (WIZARD) ═══════════════ -->
+          <div id="signupForm">
+
+            <!-- Progress indicator -->
+            <div class="wizard-progress">
+              <div class="progress-track">
+                <div class="step-circle active" id="circle1" data-step="1">1</div>
+                <div class="step-line" id="line2" data-step="2"></div>
+                <div class="step-circle" id="circle2" data-step="2">2</div>
+                <div class="step-line" id="line3" data-step="3"></div>
+                <div class="step-circle" id="circle3" data-step="3">3</div>
+              </div>
+              <div class="progress-labels">
+                <span id="label1" class="active">Account</span>
+                <span id="label2">Personal</span>
+                <span id="label3">Additional</span>
+              </div>
+            </div>
+
+            <div style="overflow-y:auto; flex:1; min-height:0;">
+
+              <!-- STEP 1: Account -->
+              <div class="wizard-step" data-step="1">
+                <div class="field-group">
+                  <label class="form-label small fw-medium">Full Name *</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-muted"></i></span>
+                    <input type="text" id="spFullName" class="form-control bg-light border-start-0" placeholder="Muhammad Ali" />
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="form-label small fw-medium">Email Address *</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
+                    <input type="email" id="spEmail" class="form-control bg-light border-start-0" placeholder="your@email.com" />
+                  </div>
+                </div>
+                <div class="form-row-2 field-group">
+                  <div>
+                    <label class="form-label small fw-medium">Password *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                      <input type="password" id="spPwd" class="form-control bg-light border-start-0 border-end-0" placeholder="Min 8 chars, Aa1!" />
+                      <button type="button" class="btn btn-outline-secondary border-start-0 bg-light" onclick="togglePwd('spPwd','spPwdIcon')"><i class="bi bi-eye" id="spPwdIcon"></i></button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label small fw-medium">Confirm Password *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock-fill text-muted"></i></span>
+                      <input type="password" id="spConfirmPwd" class="form-control bg-light border-start-0" placeholder="Repeat password" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 2: Personal -->
+              <div class="wizard-step" data-step="2" style="display:none">
+                <div class="form-row-2 field-group">
+                  <div>
+                    <label class="form-label small fw-medium">Age *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar text-muted"></i></span>
+                      <input type="number" id="spAge" class="form-control bg-light border-start-0" placeholder="25" min="18" max="80" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label small fw-medium">Gender *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-person-fill text-muted"></i></span>
+                      <select id="spGender" class="form-select bg-light border-start-0">
+                        <option value="">Select</option>
+                        <option>Male</option>
+                        <option>Female</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row-2 field-group">
+                  <div>
+                    <label class="form-label small fw-medium">Date of Birth *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-date text-muted"></i></span>
+                      <input type="date" id="spDob" class="form-control bg-light border-start-0" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label small fw-medium">CNIC / National ID *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-credit-card-2-front text-muted"></i></span>
+                      <input type="text" id="spCnic" class="form-control bg-light border-start-0" placeholder="42101-1234567-1" maxlength="15" />
+                    </div>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="form-label small fw-medium">Phone Number *</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-telephone text-muted"></i></span>
+                    <input type="tel" id="spPhone" class="form-control bg-light border-start-0" placeholder="0300-1234567" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 3: Additional -->
+              <div class="wizard-step" data-step="3" style="display:none">
+                <div class="form-row-2 field-group">
+                  <div>
+                    <label class="form-label small fw-medium">Zone / Area *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-geo-alt text-muted"></i></span>
+                      <select id="spZone" class="form-select bg-light border-start-0">
+                        <option value="">Select Zone</option>
+                        <option>North Nazimabad</option>
+                        <option>New Karachi</option>
+                        <option>Naya Nazimabad</option>
+                        <option>FB Area</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label small fw-medium">Qualification *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-mortarboard text-muted"></i></span>
+                      <input type="text" id="spQual" class="form-control bg-light border-start-0" placeholder="e.g. Nursing Diploma" />
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row-2 field-group">
+                  <div>
+                    <label class="form-label small fw-medium">Years of Experience *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-briefcase text-muted"></i></span>
+                      <input type="text" id="spExp" class="form-control bg-light border-start-0" placeholder="e.g. 5 years" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label small fw-medium">Emergency Contact *</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="bi bi-telephone-fill text-muted"></i></span>
+                      <input type="tel" id="spEmergency" class="form-control bg-light border-start-0" placeholder="0300-9876543" />
+                    </div>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="form-label small fw-medium">Address *</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-house text-muted"></i></span>
+                    <input type="text" id="spAddress" class="form-control bg-light border-start-0" placeholder="House No, Block, Area, Karachi" />
+                  </div>
+                </div>
+                <div class="field-group mb-0">
+                  <label class="form-label small fw-medium">Profile Picture</label>
+                  <input type="file" id="spPhoto" class="form-control bg-light" accept="image/*" style="font-size:0.82rem" />
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Wizard navigation -->
+            <div class="wizard-nav">
+              <button type="button" class="btn btn-outline-secondary py-2 fw-semibold rounded-3" id="wizardPrev" style="visibility:hidden" onclick="wizardPrevStep()">
+                <i class="bi bi-arrow-left me-1"></i>Previous
+              </button>
+              <button type="button" class="btn btn-primary-vm py-2 fw-semibold rounded-3" id="wizardNext" onclick="wizardNextStep()">
+                Next<i class="bi bi-arrow-right ms-1"></i>
+              </button>
+              <button class="btn btn-primary-vm py-2 fw-semibold rounded-3" id="signupBtn" style="display:none" onclick="handleSignup()">
+                <i class="bi bi-person-plus me-2"></i>Create Account
+              </button>
+            </div>
+          </div>
+
+          <div class="text-center mt-3 flex-shrink-0">
+            <a href="../index.html" class="text-muted small text-decoration-none">
+              <i class="bi bi-arrow-left me-1"></i>Back to Home
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module">
+  import '../js/firebase-auth.js';
+
+  // Check existing session
+  try {
+    const s = localStorage.getItem('vm_user_session');
+    if (s) window.location.href = 'dashboard.html';
+  } catch(e){}
+
+  const totalSteps = 3;
+  let currentStep = 1;
+
+  window.switchTab = function(tab) {
+    document.getElementById('loginForm').style.display  = tab==='login'  ? '' : 'none';
+    document.getElementById('signupForm').style.display = tab==='signup' ? 'flex' : 'none';
+    document.getElementById('tabLogin').classList.toggle('active',  tab==='login');
+    document.getElementById('tabSignup').classList.toggle('active', tab==='signup');
+    if (tab === 'signup') { currentStep = 1; updateWizardUI(); }
+    hideError(); hideSuccess();
+  };
+
+  window.togglePwd = function(inputId, iconId) {
+    const inp = document.getElementById(inputId);
+    const ico = document.getElementById(iconId);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    ico.className = inp.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+  };
+
+  window.showError = function(msg) {
+    const el = document.getElementById('errorAlert');
+    document.getElementById('errorMsg').textContent = msg;
+    el.classList.remove('d-none'); el.classList.add('d-flex');
+    document.getElementById('successAlert').classList.add('d-none');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  window.hideError = function() {
+    document.getElementById('errorAlert').classList.add('d-none');
+    document.getElementById('errorAlert').classList.remove('d-flex');
+  };
+  window.showSuccess = function(msg) {
+    const el = document.getElementById('successAlert');
+    document.getElementById('successMsg').textContent = msg;
+    el.classList.remove('d-none'); el.classList.add('d-flex');
+    hideError();
+  };
+  window.hideSuccess = function() {
+    document.getElementById('successAlert').classList.add('d-none');
+    document.getElementById('successAlert').classList.remove('d-flex');
+  };
+
+  function setLoading(btnId, loading, defaultHtml) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? '<span class="spinner-border spinner-border-sm me-2"></span>Please wait…'
+      : defaultHtml;
+  }
+
+  // ═══════ Wizard navigation ═══════
+  function updateWizardUI() {
+    document.querySelectorAll('.wizard-step').forEach(el => {
+      el.style.display = (parseInt(el.dataset.step) === currentStep) ? '' : 'none';
+    });
+    for (let i = 1; i <= totalSteps; i++) {
+      const circle = document.getElementById('circle' + i);
+      const label  = document.getElementById('label' + i);
+      circle.classList.toggle('active', i === currentStep);
+      circle.classList.toggle('completed', i < currentStep);
+      label.classList.toggle('active', i <= currentStep);
+      if (i < currentStep) {
+        circle.innerHTML = '<i class="bi bi-check-lg"></i>';
+      } else {
+        circle.innerHTML = i;
+      }
+    }
+    const line2 = document.getElementById('line2');
+    const line3 = document.getElementById('line3');
+    line2.classList.toggle('completed', currentStep > 1);
+    line3.classList.toggle('completed', currentStep > 2);
+
+    document.getElementById('wizardPrev').style.visibility = currentStep === 1 ? 'hidden' : 'visible';
+    document.getElementById('wizardNext').style.display = currentStep < totalSteps ? '' : 'none';
+    document.getElementById('signupBtn').style.display = currentStep === totalSteps ? '' : 'none';
+    hideError();
+  }
+
+  // ═══════ Field validation helpers (Signup Security hardening) ═══════
+  // Password: 8+ chars, at least one uppercase, one lowercase, one number,
+  // one special character. Returns null if valid, else an error message.
+  function passwordError(pwd) {
+    if (!pwd) return 'Password is required.';
+    if (pwd.length < 8) return 'Password must be at least 8 characters long.';
+    if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter.';
+    if (!/[a-z]/.test(pwd)) return 'Password must contain at least one lowercase letter.';
+    if (!/[0-9]/.test(pwd)) return 'Password must contain at least one number.';
+    if (!/[!@#$%^&*(),.?":{}|<>_\-\[\]\\\/~`+=;']/.test(pwd)) return 'Password must contain at least one special character (e.g. !@#$%^&*).';
+    return null;
+  }
+
+  // Email: required, must be a valid Gmail address.
+  function emailError(email) {
+    if (!email) return 'Email Address is required.';
+    if (!/^[A-Za-z0-9](\.?[A-Za-z0-9_-])*@gmail\.com$/i.test(email)) return 'Please enter a valid Gmail address (e.g. username@gmail.com).';
+    return null;
+  }
+
+  // Phone: required, must be a valid Pakistani mobile number
+  // (03XXXXXXXXX or +923XXXXXXXXX). Strips spaces/dashes before checking
+  // so existing placeholder formats like "0300-1234567" keep working.
+  function normalizePhone(phone) {
+    return (phone || '').replace(/[\s-]/g, '');
+  }
+  function phoneError(phone) {
+    const clean = normalizePhone(phone);
+    if (!clean) return 'Phone number is required.';
+    if (!/^(0|\+92)3\d{9}$/.test(clean)) return 'Please enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).';
+    return null;
+  }
+
+  function validateStep(step) {
+    if (step === 1) {
+      const fullName = document.getElementById('spFullName').value.trim();
+      const email    = document.getElementById('spEmail').value.trim();
+      const pwd      = document.getElementById('spPwd').value;
+      const confirm  = document.getElementById('spConfirmPwd').value;
+      if (!fullName) { showError('Full Name is required.'); return false; }
+      const emErr = emailError(email);
+      if (emErr) { showError(emErr); return false; }
+      const pwErr = passwordError(pwd);
+      if (pwErr) { showError(pwErr); return false; }
+      if (pwd !== confirm) { showError('Passwords do not match.'); return false; }
+    }
+    if (step === 2) {
+      const age   = document.getElementById('spAge').value;
+      const gender= document.getElementById('spGender').value;
+      const dob   = document.getElementById('spDob').value;
+      const cnic  = document.getElementById('spCnic').value.trim();
+      const phone = document.getElementById('spPhone').value.trim();
+      if (!age || age < 18 || age > 80) { showError('Please enter a valid age (18-80).'); return false; }
+      if (!gender) { showError('Please select your gender.'); return false; }
+      if (!dob)    { showError('Date of Birth is required.'); return false; }
+      if (!cnic)   { showError('CNIC / National ID is required.'); return false; }
+      if (!/^\d{5}-\d{7}-\d{1}$/.test(cnic)) { showError('CNIC must be in the format 42101-1234567-1.'); return false; }
+      const phErr = phoneError(phone);
+      if (phErr) { showError(phErr); return false; }
+    }
+    return true;
+  }
+
+  window.wizardNextStep = function() {
+    if (!validateStep(currentStep)) return;
+    if (currentStep < totalSteps) currentStep++;
+    updateWizardUI();
+  };
+  window.wizardPrevStep = function() {
+    if (currentStep > 1) currentStep--;
+    updateWizardUI();
+  };
+
+  window.handleLogin = async function() {
+    const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+    const pwd   = document.getElementById('loginPwd').value;
+    hideError();
+
+    if (!email || !pwd) { showError('Please enter your email and password.'); return; }
+
+    setLoading('loginBtn', true, '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In');
+    try {
+      await document.dispatchEvent; // wait for module
+      const result = await window.VmAuth.signIn(email, pwd);
+      if (result.success) {
+        showSuccess('Login successful! Redirecting…');
+        setTimeout(() => window.location.href = 'dashboard.html', 800);
+      }
+    } catch(err) {
+      console.error(err);
+      let msg = 'Login failed. Please check your email and password.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential')
+        msg = 'Invalid email or password. Please try again.';
+      else if (err.code === 'auth/too-many-requests')
+        msg = 'Too many failed attempts. Please try again later.';
+      else if (err.code === 'auth/network-request-failed')
+        msg = 'Network error. Please check your internet connection.';
+      showError(msg);
+    } finally {
+      setLoading('loginBtn', false, '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In');
+    }
+  };
+
+  window.handleSignup = async function() {
+    hideError();
+    const fullName       = document.getElementById('spFullName').value.trim();
+    const email          = document.getElementById('spEmail').value.trim().toLowerCase();
+    const password       = document.getElementById('spPwd').value;
+    const confirmPwd     = document.getElementById('spConfirmPwd').value;
+    const age            = document.getElementById('spAge').value;
+    const gender         = document.getElementById('spGender').value;
+    const cnic           = document.getElementById('spCnic').value.trim();
+    const dob            = document.getElementById('spDob').value;
+    const zone           = document.getElementById('spZone').value;
+    const phone          = document.getElementById('spPhone').value.trim();
+    const address        = document.getElementById('spAddress').value.trim();
+    const experience     = document.getElementById('spExp').value.trim();
+    const qualification  = document.getElementById('spQual').value.trim();
+    const emergencyContact = document.getElementById('spEmergency').value.trim();
+
+    // Validation
+    if (!fullName)       { showError('Full Name is required.'); currentStep = 1; updateWizardUI(); return; }
+    const emErr = emailError(email);
+    if (emErr)           { showError(emErr); currentStep = 1; updateWizardUI(); return; }
+    const pwErr = passwordError(password);
+    if (pwErr)           { showError(pwErr); currentStep = 1; updateWizardUI(); return; }
+    if (password !== confirmPwd) { showError('Passwords do not match.'); currentStep = 1; updateWizardUI(); return; }
+    if (!age || age < 18 || age > 80) { showError('Please enter a valid age (18-80).'); currentStep = 2; updateWizardUI(); return; }
+    if (!gender)         { showError('Please select your gender.'); currentStep = 2; updateWizardUI(); return; }
+    if (!cnic)           { showError('CNIC / National ID is required.'); currentStep = 2; updateWizardUI(); return; }
+    if (!/^\d{5}-\d{7}-\d{1}$/.test(cnic)) { showError('CNIC must be in the format 42101-1234567-1.'); currentStep = 2; updateWizardUI(); return; }
+    if (!dob)            { showError('Date of Birth is required.'); currentStep = 2; updateWizardUI(); return; }
+    const phErr = phoneError(phone);
+    if (phErr)           { showError(phErr); currentStep = 2; updateWizardUI(); return; }
+    if (!zone)           { showError('Please select your zone.'); currentStep = 3; updateWizardUI(); return; }
+    if (!address)        { showError('Address is required.'); currentStep = 3; updateWizardUI(); return; }
+    if (!experience)     { showError('Years of experience is required.'); currentStep = 3; updateWizardUI(); return; }
+    if (!qualification)  { showError('Qualification is required.'); currentStep = 3; updateWizardUI(); return; }
+    if (!emergencyContact) { showError('Emergency contact is required.'); currentStep = 3; updateWizardUI(); return; }
+
+    const cleanPhone = normalizePhone(phone);
+
+    setLoading('signupBtn', true, '<i class="bi bi-person-plus me-2"></i>Create Account');
+    try {
+      const result = await window.VmAuth.signUp({
+        fullName, email, password, age, gender, zone, phone: cleanPhone,
+        address, experience, qualification, emergencyContact,
+        cnic, dob, profileImage: null
+      });
+      if (result.success) {
+        showSuccess('Account created successfully! Redirecting…');
+        setTimeout(() => window.location.href = 'dashboard.html', 1000);
+      }
+    } catch(err) {
+      console.error(err);
+      let msg = 'Registration failed. Please try again.';
+      if (err.code === 'auth/email-already-in-use')
+        msg = 'This email is already registered. Please sign in instead.';
+      else if (err.code === 'auth/invalid-email')
+        msg = 'Please enter a valid email address.';
+      else if (err.code === 'auth/network-request-failed')
+        msg = 'Network error. Please check your internet connection.';
+      else if (!err.code && err.message)
+        msg = err.message; // validation error thrown by VmAuth.signUp
+      showError(msg);
+    } finally {
+      setLoading('signupBtn', false, '<i class="bi bi-person-plus me-2"></i>Create Account');
+    }
+  };
+
+  // Enter key support
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const isLogin  = document.getElementById('loginForm').style.display  !== 'none';
+      const isSignup = document.getElementById('signupForm').style.display !== 'none';
+      if (isLogin) { handleLogin(); }
+      if (isSignup) {
+        const active = document.activeElement;
+        if (active && active.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        if (currentStep < totalSteps) wizardNextStep();
+        else handleSignup();
+      }
+    }
+  });
+</script>
+</body>
+</html>

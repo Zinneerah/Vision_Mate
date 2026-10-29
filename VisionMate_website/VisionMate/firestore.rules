@@ -1,0 +1,274 @@
+// ============================================================
+//  VisionMate — Firestore Security Rules
+//  Deploy with: firebase deploy --only firestore:rules
+//  (requires the Firebase CLI and project 'visionmatefinal')
+// ============================================================
+//
+//  WHY THIS FILE EXISTS
+//  ---------------------
+//  This app authenticates with Firebase Auth and performs all
+//  "Admin-only" and "caretaker can only see their own patients" checks on
+//  the CLIENT (in admin/*.html and js/firebase-auth.js). That is enough to
+//  build a correct UI, but a motivated user could call the Firestore SDK
+//  directly from the browser console and bypass those checks entirely,
+//  since by default a Firestore project with no rules deployed either
+//  denies everything or (in "test mode") allows everything.
+//
+//  These rules enforce the same access model server-side:
+//   - Anyone signed in can read/write their OWN caretaker document.
+//   - Only an authenticated user whose Firestore caretaker doc says
+//     hardwareLinked == true may read documents tagged hardwareLinked.
+//   - A caretaker may only update patients currently assigned to them
+//     (e.g. status notes); they cannot reassign patients to themselves
+//     or delete patient records.
+//   - The Admin Portal now also signs in via Firebase Auth on login
+//     (see js/layout.js → vmEnsureAdminFirebaseAuth). Each admin's
+//     `caretakers/{uid}` document is tagged isAdmin: true, which the
+//     isAdmin() helper below checks. This replaces the previous
+//     necessary trade-off (Admin Portal writes going through entirely
+//     unauthenticated) with a real, rule-checked admin bypass — the
+//     per-caretaker isolation rules below are otherwise unchanged.
+//
+//  HOW TO DEPLOY
+//  --------------
+//  1. Install the Firebase CLI: npm install -g firebase-tools
+//  2. firebase login
+//  3. firebase use visionmatefinal
+//  4. Save this file as firestore.rules in your project root.
+//  5. firebase deploy --only firestore:rules
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admins are caretakers/{uid} docs tagged isAdmin: true. Used to
+    // grant the Admin Portal real, rule-checked access instead of the
+    // old unauthenticated trade-off.
+    function isAdmin() {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/caretakers/$(request.auth.uid))
+             && get(/databases/$(database)/documents/caretakers/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Signup Security hardening: mirrors the client-side wizard rules in
+    // user/login.html so a caller cannot bypass them by writing directly
+    // to Firestore. (Password strength is enforced by Firebase Auth
+    // itself, since passwords are never stored in Firestore.)
+    function isValidSignupCaretaker(data) {
+      return data.fullName is string && data.fullName.size() > 0
+          && data.email is string
+          && data.email.matches('^[A-Za-z0-9](\\.?[A-Za-z0-9_-])*@gmail\\.com$')
+          && data.phone is string
+          && data.phone.matches('^(0|\\+92)3[0-9]{9}$')
+          && data.dob is string && data.dob.size() > 0;
+    }
+
+    // ── caretakers/{caretakerId} ──────────────────────────────
+    match /caretakers/{caretakerId} {
+      // A signed-in user may read their own profile; an admin may read any.
+      allow read: if request.auth != null && request.auth.uid == caretakerId;
+      allow read: if isAdmin();
+      // Bootstrap read exception: before a legacy-seeded account (e.g.
+      // Ahmed Nawaz / 'ct_z4_1') has ever signed in via Firebase Auth,
+      // there is no caretakers/{uid} doc yet to key a self-migration
+      // check off — vmSignIn's email-fallback lookup needs to find that
+      // legacy doc by its own stored email matching the caller's own
+      // verified Firebase Auth email (request.auth.token.email), which
+      // only the legitimate account owner can ever satisfy. This is
+      // strictly a one-time discovery step; vmMigrateLegacyCaretakerToUid
+      // then creates the real caretakers/{uid} doc so every subsequent
+      // sign-in uses the normal uid-based rule above instead.
+      allow read: if request.auth != null
+                  && request.auth.token.email == resource.data.email;
+      // A signed-in user may create their own profile during signup —
+      // must satisfy the hardened signup validation rules above. Admins
+      // may create/update any caretaker doc (registration, assignment
+      // bookkeeping, account status changes) without this restriction.
+      allow create: if request.auth != null && request.auth.uid == caretakerId
+                    && isValidSignupCaretaker(request.resource.data);
+      allow create: if isAdmin();
+      allow update: if request.auth != null && request.auth.uid == caretakerId;
+      allow update: if isAdmin();
+      // Self-migration exception: a caretaker may mark their OWN
+      // declared legacy document (caretakers/{uid}.legacyDocId) as
+      // migrated, and may only ever set migratedToUid to their own
+      // uid — nothing else in that document may change via this path.
+      // This is the last step of vmMigrateLegacyCaretakerToUid.
+      allow update: if request.auth != null
+                    && get(/databases/$(database)/documents/caretakers/$(request.auth.uid)).data.legacyDocId == caretakerId
+                    && request.resource.data.migratedToUid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['migratedToUid']);
+      // Deleting caretaker accounts is an Admin-only action.
+      allow delete: if isAdmin();
+    }
+
+    // ── patients/{patientId} ──────────────────────────────────
+    match /patients/{patientId} {
+      // A caretaker may read a patient record only if it is assigned
+      // to them. This is the server-side mirror of the
+      // `where('assignedCaretakerId','==', uid)` query used by the app —
+      // without this rule, that query is a convention, not a guarantee.
+      allow read: if request.auth != null
+                  && resource.data.assignedCaretakerId == request.auth.uid;
+      // Hardware-linked patient documents are additionally restricted:
+      // only a caretaker whose own profile has hardwareLinked == true
+      // may read them, even if (hypothetically) assigned to them.
+      allow read: if request.auth != null
+                  && resource.data.hardwareLinked == true
+                  && get(/databases/$(database)/documents/caretakers/$(request.auth.uid)).data.hardwareLinked == true;
+      // Admins may read any patient record.
+      allow read: if isAdmin();
+      // Self-migration read exception, paired with the self-migration
+      // update rule below: a caretaker may look up patients still
+      // assigned to their own declared legacyDocId, which is what
+      // vmMigrateLegacyCaretakerToUid needs to find before it can
+      // re-point them to the caretaker's real uid.
+      allow read: if request.auth != null
+                  && get(/databases/$(database)/documents/caretakers/$(request.auth.uid)).data.legacyDocId == resource.data.assignedCaretakerId;
+      // Creating/assigning/deleting patients is an Admin Portal action.
+      allow create, delete: if isAdmin();
+      // A caretaker may update only documents currently assigned to
+      // them (e.g. to add a care note), and may not change who it's
+      // assigned to. Admins may update any patient record, including
+      // reassignment.
+      allow update: if request.auth != null
+                    && resource.data.assignedCaretakerId == request.auth.uid
+                    && request.resource.data.assignedCaretakerId == resource.data.assignedCaretakerId;
+      // Narrow self-migration exception: a caretaker whose own profile
+      // (caretakers/{uid}) records legacyDocId == the patient's current
+      // assignedCaretakerId may re-point that one field to their own
+      // uid, and nothing else may change in the same write. This is
+      // what lets vmMigrateLegacyCaretakerToUid (js/firebase-auth.js)
+      // move a legacy-seeded account (e.g. Ahmed Nawaz / 'ct_z4_1') onto
+      // a real Auth UID without needing admin privileges to do it — it
+      // cannot be used to take over an arbitrary other caretaker's
+      // patients, since it only matches a legacyDocId the caretaker's
+      // own profile already declares.
+      allow update: if request.auth != null
+                    && get(/databases/$(database)/documents/caretakers/$(request.auth.uid)).data.legacyDocId == resource.data.assignedCaretakerId
+                    && request.resource.data.assignedCaretakerId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedCaretakerId']);
+      allow update: if isAdmin();
+    }
+
+    // ── admin_accounts/{id} ────────────────────────────────────
+    // IMPORTANT CAVEAT: js/layout.js's vmVerifyAdminCredentials() reads
+    // this collection directly from the browser to check the entered
+    // password against the stored value. That means this collection
+    // MUST stay client-readable for the current admin login to work,
+    // which in turn means the admin password is visible to anyone who
+    // opens the browser console and queries Firestore directly — the
+    // login form is no longer hard-coded, but the check itself is still
+    // not secure against a determined client. Closing this gap properly
+    // requires moving the credential check into a Cloud Function (so the
+    // password never reaches the browser). Until then, writes are
+    // blocked here so only the Console/Admin SDK or an authenticated
+    // admin can create or change admin accounts.
+    match /admin_accounts/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── assignments/{id} ───────────────────────────────────────
+    match /assignments/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── notifications/{id} ──────────────────────────────────────
+    // Real-time, per-caretaker notification feed. A caretaker may only
+    // read/create/update notifications addressed to their own account
+    // (caretakerId == their uid) — never another caretaker's feed.
+    // Used for: patient assignment, hardware/weather/emergency alerts,
+    // and any other backend-generated event. Admins may read/create/
+    // update across all caretakers' notifications (the Admin Portal's
+    // live-notifications feed and "assign patient" notifications both
+    // need this).
+    match /notifications/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow create: if isAdmin();
+      // Only the read/unread state may be changed by the caretaker
+      // (e.g. "mark as read") — caretakerId/type/title/body stay fixed.
+      allow update: if request.auth != null
+                    && resource.data.caretakerId == request.auth.uid
+                    && request.resource.data.caretakerId == resource.data.caretakerId;
+      allow update: if isAdmin();
+      // Admins may permanently delete notifications/activity items —
+      // required for the Admin Portal's Delete button to actually
+      // remove the record from the database, not just hide it client-side.
+      allow delete: if isAdmin();
+    }
+
+    // ── auth_history/{id} ────────────────────────────────────────
+    // One event per signup/login (written by js/firebase-auth.js),
+    // kept separate from the caretaker's own profile doc so the Admin
+    // Portal's "Login & Signup History" delete button can remove a
+    // single history record without touching the actual account.
+    match /auth_history/{id} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ── emergencies/{id} ─────────────────────────────────────────
+    match /emergencies/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── call_history/{id} ─────────────────────────────────────────
+    match /call_history/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // communication_history collection removed (messaging feature disabled in v7)
+
+    // ── messages/{id} ──────────────────────────────────────────────
+    // Two-way message thread between a caretaker and their assigned
+    // patient. Scoped to the owning caretaker, same pattern as the
+    // other event-history collections above.
+    match /messages/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── hardware_alerts/{id} ───────────────────────────────────────
+    // Hardware emergency-button press events. caretakerId is taken
+    // from the patient's own assignedCaretakerId at write time, so
+    // only the caretaker actually assigned to that patient can ever
+    // read these — no other caretaker is notified.
+    match /hardware_alerts/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── activity_logs/{id} ───────────────────────────────────────────
+    // Daily Patient Activity Report entries (SOS presses, emergency
+    // alerts/calls, hardware connect/disconnect, GPS location updates,
+    // device online/offline). caretakerId is always the caretaker
+    // actually assigned to the patient the event is about — same
+    // isolation pattern as hardware_alerts/notifications above. Entries
+    // are immutable (no update) and never deleted, so "older reports
+    // must remain accessible for history" always holds.
+    match /activity_logs/{id} {
+      allow read: if request.auth != null && resource.data.caretakerId == request.auth.uid;
+      allow read: if isAdmin();
+      allow create: if request.auth != null && request.resource.data.caretakerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

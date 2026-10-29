@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitoring – VisionMate Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <!-- Leaflet for live map -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link href="../css/theme.css" rel="stylesheet" />
+  <style>
+    .hw-connected { color:var(--success); }
+    .hw-disconnected { color:#94A3B8; }
+    .pulse-ring {
+      display:inline-block;
+      width:12px;height:12px;
+      border-radius:50%;
+      background:var(--success);
+      position:relative;
+    }
+    .pulse-ring::after {
+      content:'';
+      position:absolute;inset:-4px;
+      border-radius:50%;
+      border:2px solid var(--success);
+      animation:ping 1.2s infinite;
+      opacity:.6;
+    }
+    @keyframes ping { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.8);opacity:0} }
+    .alert-item-live {
+      border-left:4px solid var(--danger);
+      background:#FEF2F2;
+      border-radius:0 .5rem .5rem 0;
+      padding:.75rem 1rem;
+      margin-bottom:.5rem;
+      animation:fadeIn .4s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+    .map-placeholder, .map-waiting {
+      background:linear-gradient(135deg,#F1F5F9,#EDE9FF);
+      border-radius:.75rem;
+      height:260px;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      color:var(--text-sub);
+      border:1px dashed var(--primary);
+    }
+    #liveMap { height:280px;border-radius:.75rem;z-index:0; }
+  </style>
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Weather Monitoring (replaces Heart Rate / SpO2 / Temp / Steps) -->
+    <div class="weather-card mb-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-4">
+          <i class="bi bi-sun-fill weather-icon" id="wIcon"></i>
+          <div>
+            <div class="weather-temp"><span id="wTemp">—</span>°C</div>
+            <div class="weather-condition" id="wCondition">Loading weather…</div>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <div class="weather-stat"><i class="bi bi-droplet-fill"></i> Humidity: <strong id="wHumidity">—</strong>%</div>
+          <div class="weather-stat"><i class="bi bi-wind"></i> Wind: <strong id="wWind">—</strong> km/h</div>
+          <div class="weather-stat"><i class="bi bi-clock-history"></i> Updated: <strong id="wUpdated">—</strong></div>
+        </div>
+      </div>
+      <div class="weather-placeholder-note" id="wPlaceholderNote" style="display:none">
+        <i class="bi bi-info-circle me-1"></i>Showing placeholder data — connect a Weather API key in <code>js/weather.js</code> to go live.
+      </div>
+    </div>
+
+    <!-- Hardware status banner -->
+    <div class="alert d-flex align-items-center gap-3 mb-4 py-3 px-4 rounded-3" id="hwStatusBanner"
+         style="background:linear-gradient(135deg,#DCFCE7,#fff);border:1px solid #86EFAC">
+      <span class="pulse-ring" id="hwDot"></span>
+      <div>
+        <strong id="hwStatusText">Connecting to hardware…</strong>
+        <div class="text-muted small" id="hwStatusSub">Establishing Firebase connection to sensor device</div>
+      </div>
+      <div class="ms-auto text-muted small" id="hwLastUpdate">—</div>
+    </div>
+
+    <!-- Caretaker & User Info -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-5">
+        <div class="section-card h-100">
+          <div class="card-header"><i class="bi bi-shield-fill-check text-warning"></i> Hardware-Monitoring Account</div>
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="user-pill-avatar" style="width:52px;height:52px;font-size:1.2rem;background:var(--gradient-btn)">AN</div>
+              <div>
+                <div class="fw-bold">Ahmed Nawaz</div>
+                <div class="text-muted small">FB Area, Karachi</div>
+                <span class="badge bg-success">Active</span>
+                <span class="badge bg-warning text-dark ms-1"><i class="bi bi-cpu-fill me-1"></i>Dedicated HW Account</span>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-6"><div class="step-card"><div class="text-muted" style="font-size:.72rem">Contact</div><div class="small fw-medium">0331-2902951</div></div></div>
+              <div class="col-6"><div class="step-card"><div class="text-muted" style="font-size:.72rem">Experience</div><div class="small fw-medium">8 years</div></div></div>
+              <div class="col-12"><div class="step-card"><div class="text-muted" style="font-size:.72rem">Address</div><div class="small">House 7, Block 14, FB Area, Karachi</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="section-card h-100">
+          <div class="card-header"><i class="bi bi-person-fill text-primary"></i> Monitored Patient — Shahbaz Qureshi</div>
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="user-pill-avatar" style="width:52px;height:52px;font-size:1.2rem;background:var(--gradient-btn)">SQ</div>
+              <div>
+                <div class="fw-bold">Shahbaz Qureshi</div>
+                <div class="text-muted small">52 years • Male • FB Area</div>
+                <span class="badge bg-success">Monitoring Active</span>
+                <span class="badge bg-warning text-dark ms-1"><i class="bi bi-cpu-fill me-1"></i>HW</span>
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-12"><div class="step-card" style="background:#FEF2F2;border-color:#FECACA">
+                <div class="text-muted small">Condition</div>
+                <div class="fw-medium small">Total blindness (traumatic optic neuropathy, 2021)</div>
+              </div></div>
+              <div class="col-md-6"><div class="step-card"><div class="text-muted small">Other Conditions</div><div class="small">Moderate hearing impairment, Hypertension</div></div></div>
+              <div class="col-md-6"><div class="step-card" style="background:#FEF2F2;border-color:#FECACA">
+                <div class="text-muted small"><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Emergency Contact</div>
+                <div class="small fw-medium">Amira Qureshi – 0306-2162996 (Wife)</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-12">
+        <div class="section-card h-100">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-geo-alt-fill"></i> Last Known Location</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary small" id="sLocation">Waiting for GPS…</span>
+          </div>
+          <div class="card-body p-0 overflow-hidden rounded-bottom-3">
+            <div id="mapWaiting" class="map-waiting">
+              <i class="bi bi-geo-alt-fill fs-1 mb-2" style="color:var(--primary)"></i>
+              <div class="fw-semibold">GPS Integration Point</div>
+              <div class="small mt-1 text-center px-3">Map will display here when hardware sends <code>lat/lng</code> to Firebase</div>
+            </div>
+            <div id="liveMap" style="display:none"></div>
+          </div>
+          <div class="card-body border-top" style="padding:.65rem 1rem">
+            <div class="row g-2" style="font-size:.8rem">
+              <div class="col-6 col-sm-3"><span class="text-muted">Latitude:</span> <strong id="locLat">—</strong></div>
+              <div class="col-6 col-sm-3"><span class="text-muted">Longitude:</span> <strong id="locLon">—</strong></div>
+              <div class="col-6 col-sm-3"><span class="text-muted">Last GPS Update:</span> <strong id="locUpdated">—</strong></div>
+              <div class="col-6 col-sm-3"><span class="text-muted">Alert Status:</span> <strong id="locAlert">—</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="section-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bell-fill text-danger"></i> Live Alerts & Notifications</span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="clearAlerts()">Clear All</button>
+      </div>
+      <div class="card-body" id="alertsContainer">
+        <div class="text-muted small text-center py-3" id="noAlertsMsg">No active alerts. Monitoring in progress…</div>
+      </div>
+    </div>
+
+    <!-- Daily Patient Activity Report -->
+    <div class="section-card mt-4">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-file-earmark-text-fill text-primary"></i> Daily Patient Activity Report</span>
+        <span class="badge bg-primary bg-opacity-10 text-primary" id="activityReportCount">0 events</span>
+      </div>
+      <div class="card-body" id="activityReportContainer" style="max-height:520px;overflow-y:auto">
+        <div class="text-muted small text-center py-4">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading activity report…
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module" src="../js/admin-firestore.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/weather.js"></script>
+<script>
+  vmRequireAdmin();
+  document.getElementById('sidebarMount').innerHTML = PortalLayout.getSidebarHTML('Monitoring');
+  document.getElementById('topbarMount').innerHTML  = PortalLayout.getTopbarHTML('Live Monitoring', 'Hardware-connected caretaker & patient — FB Area');
+
+  // ── Weather Monitoring ──────────────────────────────────────
+  async function loadWeather() {
+    const w = await VMWeather.getWeather();
+    const iconInfo = VMWeather.getWeatherIcon(w.condition);
+    document.getElementById('wTemp').textContent = w.tempC ?? '—';
+    document.getElementById('wCondition').textContent = w.condition || '—';
+    document.getElementById('wHumidity').textContent = w.humidity ?? '—';
+    document.getElementById('wWind').textContent = w.windKph ?? '—';
+    document.getElementById('wUpdated').textContent = new Date(w.updatedAt).toLocaleTimeString();
+    document.getElementById('wIcon').className = 'bi ' + iconInfo.icon + ' weather-icon';
+    document.getElementById('wPlaceholderNote').style.display = w.isPlaceholder ? 'block' : 'none';
+  }
+  loadWeather();
+  setInterval(loadWeather, 10 * 60 * 1000); // refresh every 10 minutes
+
+  // ── Alerts (now location/device-only, no vitals) ────────────
+  let alerts = [];
+
+  function pushAlert(msg, type='danger') {
+    alerts.unshift({ msg, type, time: new Date().toLocaleTimeString() });
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    const container = document.getElementById('alertsContainer');
+    if (!alerts.length) {
+      container.innerHTML = '<div class="text-muted small text-center py-3" id="noAlertsMsg">No active alerts. Monitoring in progress…</div>';
+      return;
+    }
+    container.innerHTML = alerts.slice(0,10).map(a => `
+      <div class="alert-item-live">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+          <span class="small fw-medium">${a.msg}</span>
+          <span class="ms-auto text-muted" style="font-size:.72rem">${a.time}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  function clearAlerts() { alerts = []; renderAlerts(); }
+  window.clearAlerts = clearAlerts;
+
+  // ── Daily Patient Activity Report ───────────────────────────────
+  // Groups the real-time 'activity_logs' feed by calendar date (newest
+  // date first, newest event first within each date) — matches the
+  // "08 July 2026 → 08:15 AM — Hardware Connected" layout requirement.
+  const ACTIVITY_ICONS = {
+    'SOS Button Pressed':          'bi-exclamation-octagon-fill text-danger',
+    'Emergency Call Triggered':    'bi-telephone-fill text-danger',
+    'Emergency Alert Sent':        'bi-exclamation-triangle-fill text-danger',
+    'Emergency Alert Triggered':   'bi-exclamation-triangle-fill text-danger',
+    'Hardware Connected':          'bi-cpu-fill text-success',
+    'Hardware Disconnected':       'bi-cpu-fill text-secondary',
+    'Patient Location Updated':    'bi-geo-alt-fill text-primary',
+    'Patient Status Updated':      'bi-person-fill-gear text-primary',
+    'Device Online':               'bi-wifi text-success',
+    'Device Offline':              'bi-wifi-off text-secondary'
+  };
+  function activityIcon(type) { return ACTIVITY_ICONS[type] || 'bi-clock-history text-muted'; }
+
+  function activityStatusBadge(status) {
+    const map = { Success: 'bg-success', Completed: 'bg-success', Failed: 'bg-danger', Pending: 'bg-warning text-dark' };
+    return `<span class="badge ${map[status] || 'bg-secondary'}">${status || '—'}</span>`;
+  }
+
+  function groupActivityByDate(list) {
+    const groups = {};
+    list.forEach(ev => {
+      const d = ev.createdAtDate || new Date();
+      const key = ev.dateKey || d.toLocaleDateString('en-CA');
+      if (!groups[key]) groups[key] = { dateObj: d, events: [] };
+      groups[key].events.push(ev);
+    });
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(key => ({
+        dateKey: key,
+        dateLabel: groups[key].dateObj.toLocaleDateString('en-PK', { day: '2-digit', month: 'long', year: 'numeric' }),
+        dayLabel: groups[key].dateObj.toLocaleDateString('en-PK', { weekday: 'long' }),
+        events: groups[key].events
+      }));
+  }
+
+  function renderActivityReport(list) {
+    const container = document.getElementById('activityReportContainer');
+    const countBadge = document.getElementById('activityReportCount');
+    if (!container) return;
+    if (countBadge) countBadge.textContent = `${list.length} event${list.length !== 1 ? 's' : ''}`;
+    if (!list.length) {
+      container.innerHTML = '<div class="text-muted small text-center py-4">No activity recorded yet. Events will appear here automatically as hardware data arrives — no refresh needed.</div>';
+      return;
+    }
+    const groups = groupActivityByDate(list);
+    container.innerHTML = groups.map(g => `
+      <div class="mb-3">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:.75rem">${g.dayLabel}</span>
+          <span class="fw-semibold small">${g.dateLabel}</span>
+          <span class="text-muted small ms-auto">${g.events.length} event${g.events.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="border rounded-3 overflow-hidden">
+          ${g.events.map(ev => `
+            <div class="d-flex align-items-start gap-3 px-3 py-2 border-bottom" style="font-size:.82rem">
+              <i class="bi ${activityIcon(ev.eventType)} mt-1"></i>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                  <span class="fw-medium">${ev.eventType || 'Event'}</span>
+                  ${activityStatusBadge(ev.eventStatus)}
+                </div>
+                ${ev.eventDescription ? `<div class="text-muted" style="font-size:.75rem">${ev.eventDescription}</div>` : ''}
+                <div class="d-flex flex-wrap gap-3 mt-1" style="font-size:.7rem;color:#94A3B8">
+                  <span><i class="bi bi-clock me-1"></i>${(ev.createdAtDate || new Date()).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span><i class="bi bi-person-fill me-1"></i>${ev.patientName || '—'}</span>
+                  <span><i class="bi bi-shield-fill-check me-1"></i>${ev.caretakerName || '—'}</span>
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenActivityLog(list => renderActivityReport(list));
+  });
+
+  // ── Alert de-duplication ──────────────────────────────────────
+  // onValue() replays the currently-stored RTDB value immediately on
+  // every attach (page load, tab return, reconnect) — not only when
+  // the hardware actually writes something new — so without this
+  // check the same stored alert re-appeared here every time this
+  // page was opened. Persisted in localStorage so it survives full
+  // page reloads too, not just this session.
+  function vmAlertAlreadyHandled(key, identity) {
+    const storageKey = 'vm_admin_last_alert_' + key;
+    try {
+      if (localStorage.getItem(storageKey) === identity) return true;
+      localStorage.setItem(storageKey, identity);
+    } catch (e) { /* localStorage unavailable — fall back to always-new */ }
+    return false;
+  }
+
+  // ── Live Map ──────────────────────────────────────────────
+  let leafletMap = null;
+  let leafletMarker = null;
+
+  function updateMap(lat, lon) {
+    const mapDiv     = document.getElementById('liveMap');
+    const mapWaiting = document.getElementById('mapWaiting');
+    if (!mapDiv) return;
+
+    // Show map, hide placeholder
+    mapWaiting.style.display = 'none';
+    mapDiv.style.display = 'block';
+
+    if (!leafletMap) {
+      leafletMap = L.map('liveMap').setView([lat, lon], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(leafletMap);
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:var(--primary,#7C3AED);border:3px solid #fff;width:20px;height:20px;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+      leafletMarker = L.marker([lat, lon], { icon }).addTo(leafletMap);
+      leafletMarker.bindPopup('<b>Patient Location</b><br>VisionMate Hardware Device').openPopup();
+    } else {
+      leafletMarker.setLatLng([lat, lon]);
+      leafletMap.setView([lat, lon], leafletMap.getZoom());
+    }
+  }
+
+  // ── Firebase hardware subscription (location + connectivity only) ──
+  (async () => {
+    try {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js");
+      const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js");
+      const firebaseConfig = {
+        apiKey: "AIzaSyD6jVwkx113T305BJZoEOSrI8BcKocUOFQ",
+        authDomain: "visionmatefinal.firebaseapp.com",
+        databaseURL: "https://visionmatefinal-default-rtdb.firebaseio.com",
+        projectId: "visionmatefinal",
+        storageBucket: "visionmatefinal.firebasestorage.app",
+        messagingSenderId: "146422566914",
+        appId: "1:146422566914:web:7e413bad48cc071a6f39f4"
+      };
+      let app;
+      try { app = initializeApp(firebaseConfig); } catch(e) { app = initializeApp(firebaseConfig, 'monitoring'); }
+      const db = getDatabase(app);
+
+      onValue(ref(db, 'visionmate/latest'), snap => {
+        const val = snap.val();
+        if (val) {
+          const ts = new Date(val.timestamp || Date.now());
+          document.getElementById('hwStatusText').textContent  = '⬤  Hardware Connected — Streaming Live Data';
+          document.getElementById('hwStatusSub').textContent   = `Device ID: VisionMate-HW-001 | User: Shahbaz Qureshi`;
+          document.getElementById('hwLastUpdate').textContent  = `Last update: ${ts.toLocaleTimeString()}`;
+          document.getElementById('hwStatusBanner').style.background = 'linear-gradient(135deg,#DCFCE7,#fff)';
+          document.getElementById('hwDot').style.background = 'var(--success)';
+
+          
+
+          // Alert status — val.alert is a numeric code from the ESP32:
+          // 0 = none/normal, other values map to specific alert types.
+          if (val.alert !== undefined && val.alert !== null) {
+            const ALERT_CODE_MAP = {
+              0: 'none',
+              1: 'emergency'
+              // add more codes here as hardware defines them, e.g.
+              // 2: 'fall', 3: 'obstacle', 4: 'battery low'
+            };
+            const alertCode = Number(val.alert);
+            const alertLabel = ALERT_CODE_MAP[alertCode] ?? `unknown code (${alertCode})`;
+            document.getElementById('locAlert').textContent = alertLabel;
+            if (alertCode !== 0) {
+              const identity = `${alertCode}|${val.timestamp || ''}`;
+              if (!vmAlertAlreadyHandled('telemetry', identity)) {
+                pushAlert(`⚠️ Alert: ${alertLabel}`, 'danger');
+              }
+            }
+          }
+        }
+      });
+
+            // visionmate/phone_location — user's phone GPS (live location)
+      onValue(ref(db, 'visionmate/phone_location'), snap => {
+        const val = snap.val();
+        if (!val) {
+          document.getElementById('sLocation').textContent = 'Waiting for GPS…';
+          return;
+        }
+        const ts = new Date(val.timestamp || Date.now());
+        const lat = parseFloat(val.latitude);
+        const lon = parseFloat(val.longitude);
+        if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+          document.getElementById('sLocation').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          document.getElementById('locLat').textContent     = lat.toFixed(5);
+          document.getElementById('locLon').textContent     = lon.toFixed(5);
+          document.getElementById('locUpdated').textContent = ts.toLocaleTimeString();
+          updateMap(lat, lon);
+        } else {
+          document.getElementById('sLocation').textContent = 'Waiting for GPS…';
+        }
+      });
+
+      onValue(ref(db, 'hw_alerts/bu_11'), snap => {
+        const val = snap.val();
+        if (val && val.message) {
+          const identity = JSON.stringify(val);
+          if (!vmAlertAlreadyHandled('hw_button', identity)) {
+            pushAlert(val.message, val.type || 'danger');
+          }
+        }
+      });
+
+      onValue(ref(db, '.info/connected'), snap => {
+        const connected = snap.val();
+        if (!connected) {
+          document.getElementById('hwStatusText').textContent = '○  Firebase Disconnected — Waiting for reconnection…';
+          document.getElementById('hwDot').style.background = '#94A3B8';
+        }
+      });
+
+    } catch(e) {
+      console.warn('[VisionMate HW] Firebase init failed:', e.message);
+      document.getElementById('hwStatusText').textContent = '○  Hardware Offline — Firebase connection failed';
+      document.getElementById('hwStatusSub').textContent  = 'Connect hardware device and ensure Firebase rules are set.';
+      document.getElementById('hwDot').style.background   = '#94A3B8';
+      document.getElementById('hwStatusBanner').style.background = 'linear-gradient(135deg,#F1F5F9,#fff)';
+      document.getElementById('hwStatusBanner').style.borderColor = '#CBD5E1';
+    }
+  })();
+</script>
+</body>
+</html>

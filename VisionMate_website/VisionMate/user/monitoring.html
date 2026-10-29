@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Monitoring – VisionMate User</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+  <!-- Leaflet for live map -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    .pulse-ring { display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--success);position:relative; }
+    .pulse-ring::after { content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--success);animation:ping 1.2s infinite;opacity:.6; }
+    @keyframes ping { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.8);opacity:0} }
+    .pulse-ring.disconnected { background:#94A3B8; }
+    .pulse-ring.disconnected::after { border-color:#94A3B8; animation:none; }
+    .alert-item-live { border-left:4px solid var(--danger);background:#FEF2F2;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin-bottom:.5rem; }
+    .alert-item-info  { border-left:4px solid var(--primary);background:#EDE9FF;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin-bottom:.5rem; }
+    .alert-item-warn  { border-left:4px solid #F59E0B;background:#FFFBEB;border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin-bottom:.5rem; }
+    #liveMap { height:280px;border-radius:.75rem;z-index:0; }
+    .map-waiting { background:linear-gradient(135deg,#F1F5F9,#EDE9FF);border-radius:.75rem;height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-sub);border:1px dashed var(--primary); }
+    .call-status-panel { border-radius:.75rem;padding:1rem 1.25rem;margin-top:.75rem; }
+    .call-status-panel.calling    { background:#FEF3C7;border:1px solid #FDE68A; }
+    .call-status-panel.connected  { background:#D1FAE5;border:1px solid #6EE7B7; }
+    .call-status-panel.failed     { background:#FEE2E2;border:1px solid #FCA5A5; }
+    .call-status-panel.completed  { background:#EDE9FF;border:1px solid #C4B5FD; }
+    .call-history-item { border-radius:.5rem;padding:.6rem .9rem;margin-bottom:.4rem;background:#F8FAFC;border:1px solid #E2E8F0;font-size:.82rem; }
+    .hw-status-banner { transition: background .4s, border .4s; }
+  </style>
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area" id="mainContent">
+    <!-- Content injected after RBAC check -->
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast-container">
+  <div id="mainToast" class="toast-vm" style="display:none">
+    <i class="bi bi-check-circle-fill text-success fs-5" id="toastIcon"></i>
+    <span id="toastMsg">Saved.</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module" src="../js/firebase-auth.js"></script>
+<script src="../js/user-layout.js"></script>
+<script src="../js/weather.js"></script>
+<script>
+  const session = vmRequireUser();
+  document.getElementById('sidebarMount').innerHTML = UserLayout.getSidebarHTML('Monitoring', session);
+  document.getElementById('topbarMount').innerHTML  = UserLayout.getTopbarHTML('Live Monitoring', 'Hardware-connected patient feed', session);
+
+  // ── RBAC GATE ──────────────────────────────────────────────
+  if (!session.hwLinked) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="section-card">
+        <div class="card-body rbac-denied">
+          <i class="bi bi-shield-lock-fill"></i>
+          <h5 class="fw-bold">Access Restricted</h5>
+          <p class="mb-3">Hardware Live Data is only available on the dedicated hardware-monitoring account.<br>Your account does not have permission to view this page.</p>
+          <a href="dashboard.html" class="btn btn-primary-vm btn-sm">Return to Dashboard</a>
+        </div>
+      </div>`;
+    setTimeout(() => { window.location.href = 'dashboard.html'; }, 2500);
+  } else {
+    document.getElementById('mainContent').innerHTML = `
+
+      <!-- Weather Card -->
+      <div class="weather-card mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+          <div class="d-flex align-items-center gap-4">
+            <i class="bi bi-sun-fill weather-icon" id="wIcon"></i>
+            <div>
+              <div class="weather-temp"><span id="wTemp">—</span>°C</div>
+              <div class="weather-condition" id="wCondition">Fetching weather…</div>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <div class="weather-stat"><i class="bi bi-droplet-fill"></i> Humidity: <strong id="wHumidity">—</strong>%</div>
+            <div class="weather-stat"><i class="bi bi-wind"></i> Wind: <strong id="wWind">—</strong> km/h</div>
+            <div class="weather-stat"><i class="bi bi-clock-history"></i> Updated: <strong id="wUpdated">—</strong></div>
+            <div class="weather-stat text-muted small" id="wLocationNote" style="display:none"><i class="bi bi-geo-alt-fill"></i> GPS location</div>
+          </div>
+        </div>
+        <div class="weather-placeholder-note" id="wPlaceholderNote" style="display:none">
+          <i class="bi bi-info-circle me-1"></i>Using default location — weather will auto-update when GPS data arrives from hardware.
+        </div>
+      </div>
+
+      <!-- Weather Forecast -->
+      <div class="section-card mb-4" id="forecastCard">
+        <div class="card-header"><i class="bi bi-cloud-sun-fill text-primary"></i> Weather Forecast & Risk Assessment</div>
+        <div class="card-body" id="forecastBody"><div class="text-muted small text-center py-2">Loading forecast…</div></div>
+      </div>
+
+      <!-- Hardware Status Banner -->
+      <div class="alert d-flex align-items-center gap-3 mb-4 py-3 px-4 rounded-3 hw-status-banner" id="hwStatusBanner" style="background:linear-gradient(135deg,#DCFCE7,#fff);border:1px solid #86EFAC">
+        <span class="pulse-ring" id="hwDot"></span>
+        <div class="flex-grow-1">
+          <strong id="hwStatusText">Connecting to hardware…</strong>
+          <div class="text-muted small" id="hwStatusSub">Establishing Firebase Realtime Database connection</div>
+        </div>
+        <div class="text-muted small text-end" id="hwLastUpdate">—</div>
+      </div>
+
+      <!-- Emergency Buttons -->
+      <div class="mb-4 d-flex gap-3 flex-wrap">
+        <button class="btn-emergency flex-grow-1" id="emergencyAlertBtn" onclick="triggerEmergencyAlertMon()" style="min-width:180px">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span id="emergencyAlertBtnLabel">EMERGENCY ALERT</span>
+        </button>
+        <button class="btn-emergency flex-grow-1" id="emergencyCallBtn" onclick="triggerEmergencyCallMon()" style="min-width:180px;background:linear-gradient(135deg,#DC2626,#7C3AED)">
+          <i class="bi bi-telephone-fill"></i>
+          <span id="emergencyCallBtnLabel">EMERGENCY CALL</span>
+        </button>
+      </div>
+
+      <!-- Emergency Call Status Panel (hidden until call triggered) -->
+      <div id="callStatusWrap" style="display:none" class="section-card mb-4">
+        <div class="card-header d-flex align-items-center gap-2">
+          <i class="bi bi-telephone-fill text-danger"></i> Emergency Call Status
+          <button class="btn btn-sm btn-outline-secondary ms-auto rounded-pill" onclick="toggleCallHistory()">
+            <i class="bi bi-clock-history me-1"></i><span id="callHistoryToggleLabel">Show History</span>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="callStatusPanel" class="call-status-panel calling">
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <i class="bi bi-telephone-fill fs-5" id="callStatusIcon"></i>
+              <div>
+                <div class="fw-bold" id="callStatusTitle">Emergency Call Started</div>
+                <div class="text-muted small" id="callStatusDetail">Initiating call…</div>
+              </div>
+              <div class="ms-auto text-end">
+                <div class="small fw-semibold" id="callStatusState">Calling…</div>
+                <div class="text-muted" style="font-size:.7rem" id="callStatusTime">—</div>
+              </div>
+            </div>
+            <div class="row g-2 mt-1" style="font-size:.78rem">
+              <div class="col-6"><span class="text-muted">Start Time:</span> <strong id="callStartTime">—</strong></div>
+              <div class="col-6"><span class="text-muted">End Time:</span> <strong id="callEndTime">—</strong></div>
+              <div class="col-6"><span class="text-muted">Duration:</span> <strong id="callDuration">—</strong></div>
+              <div class="col-6"><span class="text-muted">Result:</span> <strong id="callResult">—</strong></div>
+            </div>
+          </div>
+          <div id="callHistoryPanel" style="display:none" class="mt-3">
+            <div class="small fw-semibold text-muted mb-2">Call History</div>
+            <div id="callHistoryList"><div class="text-muted small text-center py-2">No previous calls.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Map + Location -->
+      <div class="section-card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-geo-alt-fill"></i> Live Location</span>
+          <span class="badge bg-primary bg-opacity-10 text-primary small" id="sLocation">Waiting for GPS…</span>
+        </div>
+        <div class="card-body p-0 overflow-hidden rounded-bottom-3">
+          <div id="mapWaiting" class="map-waiting">
+            <i class="bi bi-geo-alt-fill fs-1 mb-2" style="color:var(--primary)"></i>
+            <div class="fw-semibold">Waiting for GPS Data</div>
+            <div class="small mt-1 text-center px-3">Map will appear automatically when hardware sends location via Firebase</div>
+          </div>
+          <div id="liveMap" style="display:none"></div>
+        </div>
+        <div class="card-body border-top" style="padding:.65rem 1rem">
+          <div class="row g-2" style="font-size:.8rem">
+            <div class="col-6 col-sm-3"><span class="text-muted">Latitude:</span> <strong id="locLat">—</strong></div>
+            <div class="col-6 col-sm-3"><span class="text-muted">Longitude:</span> <strong id="locLon">—</strong></div>
+            <div class="col-6 col-sm-3"><span class="text-muted">Last GPS Update:</span> <strong id="locUpdated">—</strong></div>
+            <div class="col-6 col-sm-3"><span class="text-muted">Alert Status:</span> <strong id="locAlert">—</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Alerts -->
+      <div class="section-card">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i class="bi bi-bell-fill text-danger"></i> Live Alerts & Notifications</span>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge bg-danger rounded-pill" id="alertCountBadge" style="display:none">0</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearAlerts()">Clear All</button>
+          </div>
+        </div>
+        <div class="card-body" id="alertsContainer">
+          <div class="text-muted small text-center py-3"><i class="bi bi-shield-check me-1 text-success"></i>No active alerts. Monitoring in progress…</div>
+        </div>
+      </div>
+
+      <!-- Daily Patient Activity Report -->
+      <div class="section-card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><i class="bi bi-file-earmark-text-fill text-primary"></i> Daily Patient Activity Report</span>
+          <span class="badge bg-primary bg-opacity-10 text-primary" id="activityReportCount">0 events</span>
+        </div>
+        <div class="card-body" id="activityReportContainer" style="max-height:520px;overflow-y:auto">
+          <div class="text-muted small text-center py-4">
+            <div class="spinner-border spinner-border-sm me-2"></div>Loading activity report…
+          </div>
+        </div>
+      </div>`;
+
+    // Wait for Firebase Auth to actually be ready before touching
+    // Firestore (same pattern as assigned.html/dashboard.html/
+    // notifications.html). Previously this called initMonitoring()
+    // immediately/unconditionally, which raced ahead of Firebase Auth
+    // resolving and could leave Emergency Alert/Call unable to find the
+    // monitored patient — see js/firebase-auth.js for the related fix.
+    document.addEventListener('vm:auth-ready', () => initMonitoring());
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // STATE
+  // ══════════════════════════════════════════════════════════════
+  let alerts = [];
+  let monitoredPatient = null;
+  let leafletMap = null;
+  let leafletMarker = null;
+  let lastHwUpdate = null;
+  let hwDisconnectTimer = null;
+  let callHistory = [];
+  let weatherRefreshTimer = null;
+  let lastKnownLat = null;
+  let lastKnownLon = null;
+  let callHistoryVisible = false;
+
+  // ── Alert de-duplication ──────────────────────────────────────
+  // Firebase's onValue() fires immediately with whatever value is
+  // currently stored at a path — on every page load, every tab
+  // switch back to this page, and every reconnect — not just when
+  // the hardware actually writes something new. Since hw_alerts/bu_11
+  // and the `alert` field on visionmate/latest are persisted values
+  // (not one-shot events), that replay was being treated as a brand
+  // new alert every single time, producing extra notifications for
+  // no real reason. We track the last-processed value's identity —
+  // persisted in localStorage so it also survives a full page
+  // reload, not just listener re-attachment within the same session —
+  // and only react when it actually changes.
+  function vmAlertAlreadyHandled(key, identity) {
+    const storageKey = 'vm_last_alert_' + key;
+    try {
+      if (localStorage.getItem(storageKey) === identity) return true;
+      localStorage.setItem(storageKey, identity);
+    } catch (e) { /* localStorage unavailable — fall back to always-new */ }
+    return false;
+  }
+
+  // ── Hardware emergency → live notification bridge ─────────────
+  // ROOT CAUSE of "Alert Status shows emergency but no notification":
+  // the visionmate/latest alert-code path below only called pushAlert()
+  // (the in-page list) and never wrote a Firestore notification, which
+  // is what the Notifications page / dashboard / bell badge read.
+  // Every hardware emergency now goes through this one function, which
+  // writes the notification (+ activity log) for the assigned caretaker.
+  //  - If the assigned patient hasn't loaded yet (race on page load),
+  //    the event is held and sent as soon as the patient arrives, so an
+  //    early emergency is never silently dropped.
+  //  - Both hardware feeds (alert code + hw_alerts button) can report the
+  //    same press; anything within 15 s of the last one is collapsed.
+  let pendingHwEmergency = null;
+  let lastHwEmergencyNotifyAt = 0;
+  function notifyHardwareEmergency(message) {
+    if (Date.now() - lastHwEmergencyNotifyAt < 15000) return;
+    if (!monitoredPatient) { pendingHwEmergency = message; return; }
+    lastHwEmergencyNotifyAt = Date.now();
+    pendingHwEmergency = null;
+    VmAuth.recordHardwareButtonPress(monitoredPatient, message)
+      .catch(e => console.warn('[VisionMate] Hardware emergency notification failed:', e));
+  }
+  let lastTelemetryAlertCode = null;
+  let lastTelemetryAlertFiredAt = 0;
+
+  // ══════════════════════════════════════════════════════════════
+  // TOAST
+  // ══════════════════════════════════════════════════════════════
+  function showMonToast(msg, isError) {
+    const t = document.getElementById('mainToast');
+    if (!t) return;
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toastIcon').className = isError
+      ? 'bi bi-exclamation-circle-fill text-danger fs-5'
+      : 'bi bi-check-circle-fill text-success fs-5';
+    t.style.display = 'flex';
+    setTimeout(() => t.style.display = 'none', 4500);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ALERTS
+  // ══════════════════════════════════════════════════════════════
+  function pushAlert(msg, type) {
+    alerts.unshift({ msg, time: new Date().toLocaleTimeString(), type: type || 'danger' });
+    renderAlerts();
+  }
+  function renderAlerts() {
+    const container = document.getElementById('alertsContainer');
+    if (!container) return;
+    const badge = document.getElementById('alertCountBadge');
+    if (!alerts.length) {
+      container.innerHTML = '<div class="text-muted small text-center py-3"><i class="bi bi-shield-check me-1 text-success"></i>No active alerts. Monitoring in progress…</div>';
+      if (badge) badge.style.display = 'none';
+      return;
+    }
+    if (badge) { badge.textContent = alerts.length; badge.style.display = ''; }
+    const classMap = { danger: 'alert-item-live', primary: 'alert-item-info', warning: 'alert-item-warn' };
+    const iconMap  = { danger: 'bi-exclamation-triangle-fill text-danger', primary: 'bi-cpu-fill text-primary', warning: 'bi-exclamation-circle-fill text-warning' };
+    container.innerHTML = alerts.slice(0, 15).map(a => {
+      const cls  = classMap[a.type]  || 'alert-item-live';
+      const icon = iconMap[a.type]   || 'bi-exclamation-triangle-fill text-danger';
+      return `<div class="${cls}">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi ${icon}"></i>
+          <span class="small fw-medium">${a.msg}</span>
+          <span class="ms-auto text-muted" style="font-size:.72rem">${a.time}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  function clearAlerts() { alerts = []; renderAlerts(); }
+  window.clearAlerts = clearAlerts;
+
+  // ══════════════════════════════════════════════════════════════
+  // DAILY PATIENT ACTIVITY REPORT
+  // ══════════════════════════════════════════════════════════════
+  // Groups the real-time 'activity_logs' feed by calendar date (newest
+  // date first, newest event first within each date) — matches the
+  // "08 July 2026 → 08:15 AM — Hardware Connected" layout requirement.
+  const ACTIVITY_ICONS = {
+    'SOS Button Pressed':          'bi-exclamation-octagon-fill text-danger',
+    'Emergency Call Triggered':    'bi-telephone-fill text-danger',
+    'Emergency Alert Sent':        'bi-exclamation-triangle-fill text-danger',
+    'Emergency Alert Triggered':   'bi-exclamation-triangle-fill text-danger',
+    'Hardware Connected':          'bi-cpu-fill text-success',
+    'Hardware Disconnected':       'bi-cpu-fill text-secondary',
+    'Patient Location Updated':    'bi-geo-alt-fill text-primary',
+    'Patient Status Updated':      'bi-person-fill-gear text-primary',
+    'Device Online':               'bi-wifi text-success',
+    'Device Offline':              'bi-wifi-off text-secondary'
+  };
+  function activityIcon(type) { return ACTIVITY_ICONS[type] || 'bi-clock-history text-muted'; }
+
+  function activityStatusBadge(status) {
+    const map = { Success: 'bg-success', Completed: 'bg-success', Failed: 'bg-danger', Pending: 'bg-warning text-dark' };
+    return `<span class="badge ${map[status] || 'bg-secondary'}">${status || '—'}</span>`;
+  }
+
+  function groupActivityByDate(list) {
+    const groups = {};
+    list.forEach(ev => {
+      const d = ev.createdAtDate || new Date();
+      const key = ev.dateKey || d.toLocaleDateString('en-CA');
+      if (!groups[key]) groups[key] = { dateObj: d, events: [] };
+      groups[key].events.push(ev);
+    });
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(key => ({
+        dateKey: key,
+        dateLabel: groups[key].dateObj.toLocaleDateString('en-PK', { day: '2-digit', month: 'long', year: 'numeric' }),
+        dayLabel: groups[key].dateObj.toLocaleDateString('en-PK', { weekday: 'long' }),
+        events: groups[key].events
+      }));
+  }
+
+  function renderActivityReport(list) {
+    const container = document.getElementById('activityReportContainer');
+    const countBadge = document.getElementById('activityReportCount');
+    if (!container) return;
+    if (countBadge) countBadge.textContent = `${list.length} event${list.length !== 1 ? 's' : ''}`;
+    if (!list.length) {
+      container.innerHTML = '<div class="text-muted small text-center py-4">No activity recorded yet. Events will appear here automatically as hardware data arrives — no refresh needed.</div>';
+      return;
+    }
+    const groups = groupActivityByDate(list);
+    container.innerHTML = groups.map(g => `
+      <div class="mb-3">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:.75rem">${g.dayLabel}</span>
+          <span class="fw-semibold small">${g.dateLabel}</span>
+          <span class="text-muted small ms-auto">${g.events.length} event${g.events.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="border rounded-3 overflow-hidden">
+          ${g.events.map(ev => `
+            <div class="d-flex align-items-start gap-3 px-3 py-2 border-bottom" style="font-size:.82rem">
+              <i class="bi ${activityIcon(ev.eventType)} mt-1"></i>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                  <span class="fw-medium">${ev.eventType || 'Event'}</span>
+                  ${activityStatusBadge(ev.eventStatus)}
+                </div>
+                ${ev.eventDescription ? `<div class="text-muted" style="font-size:.75rem">${ev.eventDescription}</div>` : ''}
+                <div class="d-flex flex-wrap gap-3 mt-1" style="font-size:.7rem;color:#94A3B8">
+                  <span><i class="bi bi-clock me-1"></i>${(ev.createdAtDate || new Date()).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span><i class="bi bi-person-fill me-1"></i>${ev.patientName || '—'}</span>
+                  <span><i class="bi bi-shield-fill-check me-1"></i>${ev.caretakerName || '—'}</span>
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  // Best-effort activity logger for this page's own hardware/location
+  // events — no-ops until the assigned patient has loaded.
+  function logPatientActivity(eventType, eventStatus, eventDescription) {
+    if (!monitoredPatient || !session || !session.id) return;
+    VmAuth.logActivityEvent({
+      caretakerId: session.id,
+      caretakerName: session.name,
+      patientId: monitoredPatient.firestoreId,
+      patientName: monitoredPatient.patientName || monitoredPatient.name || 'Unknown',
+      eventType, eventStatus, eventDescription
+    }).catch(e => console.warn('[VisionMate] Activity log failed:', e));
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // HARDWARE STATUS
+  // ══════════════════════════════════════════════════════════════
+  let hwWasConnected = false;
+
+  function setHwConnected(ts) {
+    lastHwUpdate = Date.now();
+    const dot    = document.getElementById('hwDot');
+    const banner = document.getElementById('hwStatusBanner');
+    const text   = document.getElementById('hwStatusText');
+    const sub    = document.getElementById('hwStatusSub');
+    const upd    = document.getElementById('hwLastUpdate');
+    if (dot)    { dot.className = 'pulse-ring'; }
+    if (banner) { banner.style.background = 'linear-gradient(135deg,#DCFCE7,#fff)'; banner.style.border = '1px solid #86EFAC'; }
+    if (text)   text.textContent = '🟢  Hardware Connected — Streaming Live Data';
+    if (sub)    sub.textContent  = 'Device ID: VisionMate-HW-001 · Realtime Database active';
+    if (upd)    upd.textContent  = 'Last update: ' + new Date(ts || Date.now()).toLocaleTimeString();
+    // Reset disconnect timer
+    clearTimeout(hwDisconnectTimer);
+    hwDisconnectTimer = setTimeout(setHwDisconnected, 30000);
+
+    // Log a "Hardware Connected" activity event only on the actual
+    // disconnected → connected transition, not on every telemetry tick.
+    if (!hwWasConnected) {
+      hwWasConnected = true;
+      logPatientActivity('Hardware Connected', 'Success', 'Hardware device connected and streaming live data.');
+    }
+  }
+
+  function setHwDisconnected() {
+    const dot    = document.getElementById('hwDot');
+    const banner = document.getElementById('hwStatusBanner');
+    const text   = document.getElementById('hwStatusText');
+    const sub    = document.getElementById('hwStatusSub');
+    if (dot)    { dot.className = 'pulse-ring disconnected'; }
+    if (banner) { banner.style.background = 'linear-gradient(135deg,#FEE2E2,#fff)'; banner.style.border = '1px solid #FCA5A5'; }
+    if (text)   text.textContent = '🔴  Hardware Disconnected — No data received for 30s';
+    if (sub)    sub.textContent  = lastHwUpdate
+      ? 'Last seen: ' + new Date(lastHwUpdate).toLocaleTimeString()
+      : 'Device has not connected yet';
+
+    if (hwWasConnected) {
+      hwWasConnected = false;
+      logPatientActivity('Hardware Disconnected', 'Pending', 'No data received from hardware device for 30 seconds.');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // LIVE MAP
+  // ══════════════════════════════════════════════════════════════
+  function updateMap(lat, lon) {
+    const mapDiv     = document.getElementById('liveMap');
+    const mapWaiting = document.getElementById('mapWaiting');
+    if (!mapDiv) return;
+
+    // Show map, hide placeholder
+    mapWaiting.style.display = 'none';
+    mapDiv.style.display = 'block';
+
+    if (!leafletMap) {
+      leafletMap = L.map('liveMap').setView([lat, lon], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(leafletMap);
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:var(--primary,#7C3AED);border:3px solid #fff;width:20px;height:20px;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+      leafletMarker = L.marker([lat, lon], { icon }).addTo(leafletMap);
+      leafletMarker.bindPopup('<b>Patient Location</b><br>VisionMate Hardware Device').openPopup();
+    } else {
+      leafletMarker.setLatLng([lat, lon]);
+      leafletMap.setView([lat, lon], leafletMap.getZoom());
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // WEATHER (GPS-driven)
+  // ══════════════════════════════════════════════════════════════
+  async function loadWeather(lat, lon) {
+    try {
+      const useLat = lat || lastKnownLat || null;
+      const useLon = lon || lastKnownLon || null;
+      const w = await VMWeather.getWeather(useLat, useLon);
+      const iconInfo = VMWeather.getWeatherIcon(w.condition);
+      document.getElementById('wTemp').textContent      = w.tempC ?? '—';
+      document.getElementById('wCondition').textContent = w.condition || '—';
+      document.getElementById('wHumidity').textContent  = w.humidity ?? '—';
+      document.getElementById('wWind').textContent      = w.windKph ?? '—';
+      document.getElementById('wUpdated').textContent   = new Date(w.updatedAt).toLocaleTimeString();
+      document.getElementById('wIcon').className        = 'bi ' + iconInfo.icon + ' weather-icon';
+      document.getElementById('wPlaceholderNote').style.display = w.isPlaceholder ? 'block' : 'none';
+      const locNote = document.getElementById('wLocationNote');
+      if (locNote) locNote.style.display = (useLat && !w.isPlaceholder) ? '' : 'none';
+    } catch (e) { console.warn('[VisionMate] Weather load error:', e); }
+  }
+
+  async function loadForecast(lat, lon) {
+    try {
+      const forecast = await VMWeather.getForecast(lat || lastKnownLat, lon || lastKnownLon);
+      if (!forecast) { document.getElementById('forecastBody').innerHTML = '<div class="text-muted small text-center py-2">Forecast unavailable.</div>'; return; }
+      const risk = VMWeather.getWeatherRisk(forecast);
+      const days = forecast.slice(0, 5);
+      const alertsHtml = risk.alerts.length
+        ? risk.alerts.map(a => `<div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-exclamation-triangle-fill text-${risk.color}"></i><span class="small">${a}</span></div>`).join('')
+        : '<div class="small text-success"><i class="bi bi-check-circle-fill me-1"></i>No significant weather risks in the next 24 hours.</div>';
+      document.getElementById('forecastBody').innerHTML = `
+        <div class="mb-3 p-3 rounded-2" style="background:${risk.color==='success'?'#F0FDF4':risk.color==='warning'?'#FFFBEB':'#FEF2F2'};border:1px solid ${risk.color==='success'?'#86EFAC':risk.color==='warning'?'#FDE68A':'#FECACA'}">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-${risk.color} fw-semibold">Weather Risk: ${risk.level}</span>
+          </div>
+          ${alertsHtml}
+        </div>
+        <div class="row g-2">
+          ${days.map((d, i) => {
+            const icon = VMWeather.getWeatherIcon(d.condition);
+            const label = VMWeather.getDayLabel(d.date, i);
+            return `<div class="col"><div class="step-card text-center" style="min-width:80px">
+              <div class="fw-semibold" style="font-size:.7rem">${label}</div>
+              <i class="bi ${icon.icon} fs-4 my-1" style="color:${icon.color}"></i>
+              <div style="font-size:.72rem">${d.maxTemp}°/${d.minTemp}°C</div>
+              <div style="font-size:.68rem;color:#3B82F6"><i class="bi bi-droplet-fill"></i> ${d.rainChance}%</div>
+              <div style="font-size:.65rem;color:#64748B">${d.condition}</div>
+            </div></div>`;
+          }).join('')}
+        </div>`;
+    } catch(e) { console.warn('[VisionMate] Forecast failed:', e); }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // CALL STATUS UI
+  // ══════════════════════════════════════════════════════════════
+  function showCallStatus(state, detail) {
+    const wrap = document.getElementById('callStatusWrap');
+    const panel = document.getElementById('callStatusPanel');
+    if (!wrap || !panel) return;
+    wrap.style.display = '';
+
+    const classMap = { calling: 'calling', connected: 'connected', failed: 'failed', completed: 'completed' };
+    const iconMap  = { calling: 'bi-telephone-fill', connected: 'bi-telephone-inbound-fill', failed: 'bi-telephone-x-fill', completed: 'bi-check-circle-fill' };
+    const titleMap = { calling: 'Emergency Call Started', connected: 'Call Connected', failed: 'Call Failed', completed: 'Call Completed' };
+
+    panel.className = 'call-status-panel ' + (classMap[state] || 'calling');
+    document.getElementById('callStatusIcon').className  = 'bi ' + (iconMap[state] || 'bi-telephone-fill') + ' fs-5';
+    document.getElementById('callStatusTitle').textContent  = titleMap[state] || 'Emergency Call';
+    document.getElementById('callStatusDetail').textContent = detail || '';
+    document.getElementById('callStatusState').textContent  = state.charAt(0).toUpperCase() + state.slice(1);
+    document.getElementById('callStatusTime').textContent   = new Date().toLocaleTimeString();
+  }
+
+  function updateCallTimes(startTime, endTime, duration, result) {
+    if (startTime) document.getElementById('callStartTime').textContent = startTime;
+    if (endTime)   document.getElementById('callEndTime').textContent   = endTime;
+    if (duration)  document.getElementById('callDuration').textContent  = duration;
+    if (result)    document.getElementById('callResult').textContent    = result;
+  }
+
+  function addCallHistory(entry) {
+    callHistory.unshift(entry);
+    renderCallHistory();
+  }
+
+  function renderCallHistory() {
+    const list = document.getElementById('callHistoryList');
+    if (!list) return;
+    if (!callHistory.length) {
+      list.innerHTML = '<div class="text-muted small text-center py-2">No previous calls.</div>';
+      return;
+    }
+    list.innerHTML = callHistory.map(c => `
+      <div class="call-history-item">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-telephone-fill text-${c.success ? 'success' : 'danger'}"></i>
+          <span class="fw-semibold">${c.contact || 'Emergency Contact'}</span>
+          <span class="ms-auto text-muted">${c.time}</span>
+        </div>
+        <div class="text-muted mt-1" style="font-size:.75rem">${c.status} · ${c.phone || '—'}</div>
+      </div>`).join('');
+  }
+
+  function toggleCallHistory() {
+    callHistoryVisible = !callHistoryVisible;
+    document.getElementById('callHistoryPanel').style.display = callHistoryVisible ? '' : 'none';
+    document.getElementById('callHistoryToggleLabel').textContent = callHistoryVisible ? 'Hide History' : 'Show History';
+  }
+  window.toggleCallHistory = toggleCallHistory;
+
+  // ══════════════════════════════════════════════════════════════
+  // EMERGENCY ALERT
+  // ══════════════════════════════════════════════════════════════
+  async function triggerEmergencyAlertMon() {
+    const btn   = document.getElementById('emergencyAlertBtn');
+    const label = document.getElementById('emergencyAlertBtnLabel');
+    if (!monitoredPatient) { showMonToast('No assigned patient on record to send an emergency alert for.', true); return; }
+    btn.disabled = true; btn.classList.add('triggered'); label.textContent = 'SENDING ALERT…';
+    try {
+      const result = await VmAuth.triggerEmergencyAlert(session.id, monitoredPatient);
+      label.textContent = 'ALERT SENT ✓';
+      pushAlert(result.contactNumber
+        ? `Emergency Alert sent to ${result.contactName || 'emergency contact'} (${result.contactNumber})`
+        : 'Emergency Alert recorded — no emergency contact on file.', 'danger');
+      showMonToast(result.contactNumber
+        ? `Emergency alert sent to ${result.contactName || 'emergency contact'} (${result.contactNumber}).`
+        : 'Emergency event recorded — no emergency contact on file.');
+    } catch (e) {
+      label.textContent = 'EMERGENCY ALERT';
+      showMonToast('Could not send alert: ' + e.message, true);
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('triggered'); label.textContent = 'EMERGENCY ALERT'; }, 4000);
+    }
+  }
+  window.triggerEmergencyAlertMon = triggerEmergencyAlertMon;
+
+  // ══════════════════════════════════════════════════════════════
+  // EMERGENCY CALL (with full frontend status)
+  // ══════════════════════════════════════════════════════════════
+  async function triggerEmergencyCallMon() {
+    const btn   = document.getElementById('emergencyCallBtn');
+    const label = document.getElementById('emergencyCallBtnLabel');
+    if (!monitoredPatient) { showMonToast('No assigned patient on record to call for.', true); return; }
+    btn.disabled = true; btn.classList.add('triggered'); label.textContent = 'CALLING…';
+
+    const startTime = new Date().toLocaleTimeString();
+    showCallStatus('calling', 'Dialing emergency contact…');
+    updateCallTimes(startTime, '—', '—', '—');
+
+    try {
+      const result = await VmAuth.triggerEmergencyCall(session.id, monitoredPatient);
+      const endTime = new Date().toLocaleTimeString();
+
+      // Calculate duration
+      const start = new Date(); const end = new Date();
+      const durationSec = Math.round((end - start) / 1000) || 3;
+      const durationStr = durationSec < 60 ? durationSec + 's' : Math.floor(durationSec/60) + 'm ' + (durationSec%60) + 's';
+
+      const success = !!result.contactNumber;
+      const finalState = success ? 'completed' : 'failed';
+      const finalDetail = result.contactNumber
+        ? `Called ${result.contactName || 'Emergency Contact'} (${result.contactNumber}) — ${result.callStatus}`
+        : 'No emergency contact on file';
+
+      showCallStatus(finalState, finalDetail);
+      updateCallTimes(startTime, endTime, durationStr, success ? '✅ Success' : '❌ No Contact');
+      document.getElementById('callStatusState').textContent = success ? 'Call Completed' : 'No Contact';
+
+      addCallHistory({
+        contact: result.contactName || 'Emergency Contact',
+        phone: result.contactNumber || '—',
+        status: result.callStatus || '—',
+        time: startTime,
+        success
+      });
+
+      label.textContent = success ? 'CALL PLACED ✓' : 'CALL ATTEMPTED';
+      if (result.contactNumber) {
+        window.open('tel:' + result.contactNumber.replace(/[^0-9+]/g, ''), '_self');
+      }
+      showMonToast(success
+        ? `Emergency call to ${result.contactName || 'emergency contact'} (${result.contactNumber}) — ${result.callStatus}`
+        : 'Call recorded — no emergency contact on file.');
+
+      pushAlert(success
+        ? `📞 Emergency Call placed to ${result.contactName || 'contact'} (${result.contactNumber})`
+        : '📞 Emergency Call attempted — no contact on file.', 'primary');
+
+    } catch (e) {
+      const endTime = new Date().toLocaleTimeString();
+      showCallStatus('failed', 'Call failed: ' + e.message);
+      updateCallTimes(startTime, endTime, '—', '❌ Failed');
+      label.textContent = 'EMERGENCY CALL';
+      showMonToast('Could not place call: ' + e.message, true);
+      addCallHistory({ contact: '—', phone: '—', status: 'Failed: ' + e.message, time: startTime, success: false });
+    } finally {
+      setTimeout(() => { btn.disabled = false; btn.classList.remove('triggered'); label.textContent = 'EMERGENCY CALL'; }, 5000);
+    }
+  }
+  window.triggerEmergencyCallMon = triggerEmergencyCallMon;
+
+  // ══════════════════════════════════════════════════════════════
+  // ALERT TYPE CLASSIFIER (from hardware raw message)
+  // ══════════════════════════════════════════════════════════════
+  function classifyAlert(msg) {
+    const m = (msg || '').toLowerCase();
+    if (m.includes('fall'))        return { type: 'danger',  label: '🚨 Fall Detected' };
+    if (m.includes('sos') || m.includes('emergency') || m.includes('button')) return { type: 'danger', label: '🆘 SOS Button Pressed' };
+    if (m.includes('obstacle'))    return { type: 'warning', label: '⚠️ Obstacle Detected' };
+    if (m.includes('battery'))     return { type: 'warning', label: '🔋 Battery Low' };
+    if (m.includes('disconnect'))  return { type: 'primary', label: '📡 Device Disconnected' };
+    if (m.includes('connect'))     return { type: 'primary', label: '✅ Device Connected' };
+    return { type: 'danger', label: msg };
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // INIT
+  // ══════════════════════════════════════════════════════════════
+  async function initMonitoring() {
+    // Load initial weather with default location
+    loadWeather();
+    loadForecast();
+
+    // Refresh weather every 10 min (or sooner if GPS arrives)
+    setInterval(() => loadWeather(lastKnownLat, lastKnownLon), 10 * 60 * 1000);
+    setInterval(() => loadForecast(lastKnownLat, lastKnownLon), 30 * 60 * 1000);
+
+    // Load assigned patient — use the live listener (same as
+    // assigned.html/dashboard.html) instead of a one-time fetch. A
+    // one-time getDocs() that races ahead of Firebase Auth resolving
+    // fails permission-denied exactly once and never retries, leaving
+    // monitoredPatient stuck at null forever (which is why Emergency
+    // Alert/Call on this page could silently stop working while the
+    // same actions in the Patient section, which uses this same live
+    // listener, kept working). onSnapshot re-delivers data as soon as
+    // auth is actually ready, so this self-heals instead of failing once.
+    VmAuth.listenAssignedPatients(session.id, persons => {
+      const p = persons.find(x => x.hardwareLinked) || persons[0];
+      monitoredPatient = p || null;
+      if (monitoredPatient && pendingHwEmergency) notifyHardwareEmergency(pendingHwEmergency);
+    });
+
+    // Daily Patient Activity Report — real-time, grouped-by-date feed
+    // for this hardware-monitoring account. Updates live via onSnapshot,
+    // no page refresh required.
+    if (session && session.id) {
+      VmAuth.listenActivityLog(session.id, list => renderActivityReport(list));
+    }
+
+    // ── Firebase Realtime Database ──────────────────────────────
+    try {
+      const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js");
+      const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js");
+      const firebaseConfig = {
+        apiKey: "AIzaSyD6jVwkx113T305BJZoEOSrI8BcKocUOFQ",
+        authDomain: "visionmatefinal.firebaseapp.com",
+        databaseURL: "https://visionmatefinal-default-rtdb.firebaseio.com",
+        projectId: "visionmatefinal",
+        storageBucket: "visionmatefinal.firebasestorage.app",
+        messagingSenderId: "146422566914",
+        appId: "1:146422566914:web:7e413bad48cc071a6f39f4"
+      };
+
+      const existingApps = getApps();
+      const monApp = existingApps.find(a => a.name === 'vm-monitor') || initializeApp(firebaseConfig, 'vm-monitor');
+      const db = getDatabase(monApp);
+
+      // ── visionmate/latest — primary hardware data stream ──────
+      onValue(ref(db, 'visionmate/latest'), snap => {
+        const val = snap.val();
+        if (!val) {
+          return;
+        }
+
+        const ts = val.timestamp ? new Date(val.timestamp) : new Date();
+        setHwConnected(ts);
+
+       
+
+        // Alert Status from hardware
+        // val.alert is a numeric code from the ESP32: 0 = none/normal,
+        // other values map to specific alert types below. Adjust this
+        // map as more hardware alert codes are defined.
+        if (val.alert !== undefined && val.alert !== null) {
+          const ALERT_CODE_MAP = {
+            0: 'none',
+            1: 'emergency'
+            // add more codes here as hardware defines them, e.g.
+            // 2: 'fall', 3: 'obstacle', 4: 'battery low'
+          };
+          const alertCode = Number(val.alert);
+          const alertLabel = ALERT_CODE_MAP[alertCode] ?? `unknown code (${alertCode})`;
+
+          document.getElementById('locAlert').textContent = alertLabel;
+
+          if (alertCode !== 0) {
+            // Fire on a NEW emergency: 0 -> non-zero, or a different
+            // code. On the first reading after page load, fall back to
+            // the stored identity so a replayed old value is ignored.
+            // While the alert simply stays active, send a reminder
+            // notification every 60 s (not on every telemetry tick).
+            const identity = `${alertCode}|${val.timestamp || ''}`;
+            const nowMs = Date.now();
+            const isNew = lastTelemetryAlertCode === null
+              ? !vmAlertAlreadyHandled('telemetry', identity)
+              : (lastTelemetryAlertCode === 0 || lastTelemetryAlertCode !== alertCode);
+            if (lastTelemetryAlertCode === null && !isNew) lastTelemetryAlertFiredAt = nowMs;
+            const isReminder = !isNew && (nowMs - lastTelemetryAlertFiredAt > 60000);
+            if (isNew || isReminder) {
+              lastTelemetryAlertFiredAt = nowMs;
+              const classified = classifyAlert(alertLabel);
+              pushAlert(classified.label, classified.type);
+              notifyHardwareEmergency('Emergency alert received from hardware (alert code ' + alertCode + ').');
+            }
+          }
+          lastTelemetryAlertCode = alertCode;
+        }
+      });
+
+      // ── visionmate/phone_location — user's phone GPS (live location) ──
+      onValue(ref(db, 'visionmate/phone_location'), snap => {
+        const val = snap.val();
+        if (!val) {
+          document.getElementById('sLocation').textContent = 'Waiting for GPS…';
+          return;
+        }
+        const ts = val.timestamp ? new Date(val.timestamp) : new Date();
+
+        const lat = parseFloat(val.latitude);
+        const lon = parseFloat(val.longitude);
+        if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+          const locChanged = (lat !== lastKnownLat || lon !== lastKnownLon);
+          lastKnownLat = lat;
+          lastKnownLon = lon;
+
+          document.getElementById('sLocation').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          document.getElementById('locLat').textContent     = lat.toFixed(5);
+          document.getElementById('locLon').textContent     = lon.toFixed(5);
+          document.getElementById('locUpdated').textContent = ts.toLocaleTimeString();
+
+          updateMap(lat, lon);
+
+          if (locChanged) {
+            VMWeather.setWeatherLocation(lat, lon);
+            clearTimeout(weatherRefreshTimer);
+            weatherRefreshTimer = setTimeout(() => {
+              loadWeather(lat, lon);
+              loadForecast(lat, lon);
+            }, 800);
+
+            logPatientActivity('Patient Location Updated', 'Success', `GPS location updated to ${lat.toFixed(5)}, ${lon.toFixed(5)}.`);
+          }
+        } else {
+          document.getElementById('sLocation').textContent = 'Waiting for GPS…';
+          document.getElementById('locLat').textContent    = 'Loading…';
+          document.getElementById('locLon').textContent    = 'Loading…';
+        }
+      });
+
+
+
+      // ── hw_alerts — hardware physical button / event feed ──────
+      onValue(ref(db, 'hw_alerts/bu_11'), snap => {
+        const val = snap.val();
+        if (val && val.message) {
+          const identity = JSON.stringify(val);
+          if (!vmAlertAlreadyHandled('hw_button', identity)) {
+            const classified = classifyAlert(val.message);
+            pushAlert(classified.label, classified.type);
+            // Only real emergencies (SOS / fall) become an emergency
+            // notification — "device connected", "battery low" etc. stay
+            // on the live list only.
+            if (classified.type === 'danger') notifyHardwareEmergency(val.message);
+          }
+        }
+      });
+
+      // ── .info/connected — Firebase connectivity ────────────────
+      // NOTE: this listener always fires once immediately with `false`
+      // on initial attach (before the socket handshake completes), then
+      // fires again with `true` once actually connected. That first
+      // `false` is expected startup behavior, not a real disconnect —
+      // so we only treat it as a real drop if we had previously been
+      // connected and then lost it.
+      let hadConnectedBefore = false;
+      onValue(ref(db, '.info/connected'), snap => {
+        const isConnected = !!snap.val();
+
+        if (!isConnected) {
+          if (hadConnectedBefore) {
+            // Real disconnect: we were connected, now we're not.
+            const dot = document.getElementById('hwDot');
+            const txt = document.getElementById('hwStatusText');
+            const sub = document.getElementById('hwStatusSub');
+            if (dot) dot.className = 'pulse-ring disconnected';
+            if (txt) txt.textContent = '⚫  Firebase Offline — Reconnecting…';
+            if (sub) sub.textContent = 'Check internet connection';
+            pushAlert('⚡ Firebase connection lost — attempting reconnect', 'warning');
+            logPatientActivity('Device Offline', 'Pending', 'Firebase connection lost — device offline, attempting reconnect.');
+          }
+          // else: initial handshake, not yet connected — ignore silently.
+        } else {
+          if (hadConnectedBefore) {
+            // Firebase reconnected after a real drop — show waiting state.
+            const txt = document.getElementById('hwStatusText');
+            const sub = document.getElementById('hwStatusSub');
+            if (txt && txt.textContent.includes('Offline')) {
+              txt.textContent = 'Reconnected — Waiting for hardware data…';
+              if (sub) sub.textContent = 'Firebase connection restored';
+            }
+            logPatientActivity('Device Online', 'Success', 'Firebase connection restored — device back online.');
+          }
+          hadConnectedBefore = true;
+        }
+      });
+
+    } catch(e) {
+      console.warn('[VisionMate HW] Firebase init failed:', e.message);
+      document.getElementById('hwStatusText').textContent = '🔴  Hardware Offline — Firebase connection failed';
+      document.getElementById('hwStatusSub').textContent  = 'Check Firebase configuration and internet connection.';
+      document.getElementById('hwDot').className = 'pulse-ring disconnected';
+      pushAlert('❌ Firebase initialization failed: ' + e.message, 'danger');
+    }
+  }
+</script>
+</body>
+</html>

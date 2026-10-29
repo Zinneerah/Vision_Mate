@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – VisionMate User</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Welcome Banner -->
+    <div class="section-card mb-4" style="background:var(--gradient-btn);border:none">
+      <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+        <div id="welcomeAvatar" class="user-pill-avatar" style="width:56px;height:56px;font-size:1.3rem;flex-shrink:0;background:rgba(255,255,255,0.2)">?</div>
+        <div class="flex-grow-1">
+          <h4 class="text-white fw-bold mb-1" id="welcomeName">Welcome back!</h4>
+          <p class="mb-0" style="color:rgba(255,255,255,0.75);font-size:0.85rem" id="welcomeZone"></p>
+        </div>
+        <div id="hwBanner" class="d-none">
+          <span class="badge py-2 px-3" style="background:rgba(255,255,255,0.2);font-size:0.8rem">
+            <i class="bi bi-cpu-fill me-1"></i>Hardware Device Active
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-card"><div class="stat-icon cyan"><i class="bi bi-people-fill"></i></div>
+          <div><p class="mb-0 small text-muted">Assigned Patients</p><p class="fw-bold fs-4 mb-0" id="stTotal">0</p></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card"><div class="stat-icon green"><i class="bi bi-check-circle-fill"></i></div>
+          <div><p class="mb-0 small text-muted">Active</p><p class="fw-bold fs-4 mb-0" id="stActive">0</p></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card"><div class="stat-icon orange"><i class="bi bi-activity"></i></div>
+          <div><p class="mb-0 small text-muted">Under Monitoring</p><p class="fw-bold fs-4 mb-0" id="stMonitoring">0</p></div></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card"><div class="stat-icon purple"><i class="bi bi-cpu-fill"></i></div>
+          <div><p class="mb-0 small text-muted">HW Device</p><p class="fw-bold fs-4 mb-0" id="stHw">—</p></div></div>
+      </div>
+    </div>
+
+    <!-- HW Monitor quick-link (RBAC: only rendered for hardware-linked account) -->
+    <div id="hwQuickCard" class="d-none mb-4">
+      <div class="section-card" style="border-color:#A5B4FC;background:linear-gradient(135deg,#EDE9FF,#CFFAFE)">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+          <div style="width:48px;height:48px;background:var(--gradient-btn);border-radius:.6rem;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;flex-shrink:0">
+            <i class="bi bi-cpu-fill"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold" id="hwPersonName">Hardware-monitored patient</div>
+            <div class="text-muted small" id="hwPersonInfo">Live sensor feed — Firebase connected</div>
+          </div>
+          <a href="monitoring.html" class="btn btn-primary-vm btn-sm px-3 rounded-pill">
+            <i class="bi bi-eye-fill me-1"></i>Live Monitor
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monitored Patient Full Detail Card (shown for hardware-linked account) -->
+    <div id="monitoredPatientCard" class="d-none mb-4">
+      <div class="section-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-person-vcard-fill text-primary"></i> Monitored Patient Details</span>
+          <span class="badge bg-success rounded-pill" style="font-size:.65rem"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Live Data</span>
+        </div>
+        <div class="card-body" id="monitoredPatientBody">
+          <div class="text-muted small text-center py-3">Loading patient details…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Patients quick grid -->
+    <div class="section-card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people-fill"></i> Assigned Patients</span>
+        <a href="assigned.html" class="btn btn-sm btn-outline-primary rounded-pill">View All</a>
+      </div>
+      <div class="card-body">
+        <div class="row g-3" id="quickPersonGrid">
+          <div class="col-12 text-muted small text-center py-3" id="loadingPersons">Loading assigned patients…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Notifications -->
+    <div class="section-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bell-fill text-primary"></i> Recent Notifications</span>
+        <a href="notifications.html" class="text-muted small text-decoration-none">View all →</a>
+      </div>
+      <div class="card-body" id="notifList"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast-container">
+  <div id="mainToast" class="toast-vm" style="display:none">
+    <i class="bi bi-check-circle-fill text-success fs-5" id="toastIcon"></i>
+    <span id="toastMsg">Saved.</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/firebase-auth.js"></script>
+<script src="../js/user-layout.js"></script>
+<script>
+  const session = vmRequireUser();
+
+  document.getElementById('sidebarMount').innerHTML = UserLayout.getSidebarHTML('Dashboard', session);
+  document.getElementById('topbarMount').innerHTML  = UserLayout.getTopbarHTML('My Dashboard', 'Your assigned patients overview', session, 3);
+
+  document.getElementById('welcomeAvatar').textContent = getInitialU(session.name);
+  document.getElementById('welcomeName').textContent   = 'Welcome back, ' + session.name.split(' ')[0] + '!';
+  document.getElementById('welcomeZone').textContent   = 'Zone: ' + (session.zone || '—') + ' — ' + new Date().toLocaleDateString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  if (session.hwLinked) document.getElementById('hwBanner').classList.remove('d-none');
+
+  let assignedPersons = [];
+
+    function renderPatients(persons) {
+    assignedPersons = persons;
+    const active     = persons.filter(p => (p.monitoringStatus||'Active') === 'Active').length;
+    const monitoring = persons.filter(p => p.monitoringStatus === 'Monitoring').length;
+    // RBAC: hardware card only ever shows for the dedicated hardware account.
+    const hwPerson   = session.hwLinked ? (persons.find(p => p.hardwareLinked) || persons[0]) : null;
+
+    document.getElementById('stTotal').textContent      = persons.length;
+    document.getElementById('stActive').textContent     = active;
+    document.getElementById('stMonitoring').textContent  = monitoring;
+    document.getElementById('stHw').textContent          = hwPerson ? '1 Live' : 'None';
+
+    if (hwPerson) {
+      document.getElementById('hwQuickCard').classList.remove('d-none');
+      document.getElementById('hwPersonName').textContent = (hwPerson.patientName || hwPerson.name) + ' — Hardware Monitoring Active';
+      document.getElementById('hwPersonInfo').textContent = (hwPerson.disease || hwPerson.medicalInfo || '') + (hwPerson.notes ? ' | ' + hwPerson.notes.substring(0, 60) + '…' : '');
+    }
+
+    const grid = document.getElementById('quickPersonGrid');
+    document.getElementById('loadingPersons')?.remove();
+    if (!persons.length) {
+      grid.innerHTML = '<div class="col-12 text-muted small text-center py-3">No patients have been assigned to you yet. Your administrator will assign patients from the Admin Portal.</div>';
+      return;
+    }
+    grid.innerHTML = persons.map(p => {
+      const name = p.patientName || p.name || '—';
+      const isHw = !!p.hardwareLinked && session.hwLinked;
+      return `
+      <div class="col-md-6 col-lg-4">
+        <a href="assigned.html" class="user-card text-decoration-none d-block">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="user-pill-avatar" style="width:36px;height:36px;font-size:0.82rem;flex-shrink:0;${isHw?'background:var(--gradient-btn)':''}">${getInitialU(name)}</div>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold small">${name} ${isHw?'<span class="badge ms-1" style="background:var(--gradient-btn);font-size:0.55rem">LIVE</span>':''}</div>
+              <div class="text-muted" style="font-size:0.7rem">Age ${p.age||'—'} · ${p.gender||'—'}</div>
+            </div>
+            ${monBadgeU(p.monitoringStatus||'Active')}
+          </div>
+          <div class="text-muted small" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.disease || p.medicalInfo || '—'}</div>
+        </a>
+      </div>`;
+    }).join('');
+  }
+
+  // Recent Notifications — real-time, never fabricated. Shows the 3 most
+  // recent real backend-generated notifications, or an empty state.
+  function renderRecentNotifs(list) {
+    const recent = list.slice(0, 3);
+    if (!recent.length) {
+      document.getElementById('notifList').innerHTML = '<div class="text-muted small text-center py-3">No notifications yet.</div>';
+      return;
+    }
+    document.getElementById('notifList').innerHTML = recent.map(n => {
+      const colorMap = { assignment:'primary', patient:'primary', hardware:'primary', emergency:'danger', weather:'danger', reminder:'warning', system:'success' };
+      const color = colorMap[n.type] || 'primary';
+      const timeStr = n.createdAtDate ? timeAgoDash(n.createdAtDate) : 'Just now';
+      return `
+      <div class="timeline-item mb-2">
+        <div class="timeline-dot bg-${color}" style="margin-top:5px"></div>
+        <div><div class="small">${n.title}${n.body ? ' — ' + n.body : ''}</div><div class="text-muted" style="font-size:0.72rem">${timeStr}</div></div>
+      </div>`;
+    }).join('');
+  }
+  function timeAgoDash(date) {
+    const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (secs < 60) return 'Just now';
+    if (secs < 3600) return Math.floor(secs/60) + ' min ago';
+    if (secs < 86400) return Math.floor(secs/3600) + ' hr ago';
+    return Math.floor(secs/86400) + ' day' + (Math.floor(secs/86400) === 1 ? '' : 's') + ' ago';
+  }
+
+  // Patient detail modal
+  function openPatientDetail(idx) {
+    const p = assignedPersons[idx];
+    if (!p) return;
+    const name = p.patientName || p.name || '—';
+    const isHw = !!p.hardwareLinked && session.hwLinked;
+    const rows = [
+      ['Patient Name', name],
+      ['Age', p.age || '—'],
+      ['Gender', p.gender || '—'],
+      ['Blood Group', p.bloodGroup || '—'],
+      ['Height', p.height || '—'],
+      ['Weight', p.weight || '—'],
+      ['Disease / Condition', p.disease || p.medicalInfo || '—'],
+      ['Other Conditions', p.otherConditions || '—'],
+      ['Contact', p.contact || '—'],
+      ['Emergency Contact', (p.relativeName || '') + (p.emergencyContact ? ' — ' + p.emergencyContact : '') || '—'],
+      ['Address', p.address || '—'],
+      ['Monitoring Status', p.monitoringStatus || 'Active'],
+      ['Assigned Caretaker', p.assignedCaretakerName || session.name],
+      ['Notes', p.notes || '—']
+    ];
+    const html = `
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="user-pill-avatar" style="width:56px;height:56px;font-size:1.3rem;${isHw?'background:var(--gradient-btn)':''}">${getInitialU(name)}</div>
+        <div>
+          <div class="fw-bold fs-5">${name} ${isHw?'<span class="badge ms-1" style="background:var(--gradient-btn)">LIVE HW</span>':''}</div>
+          <div class="text-muted small">${p.disease || p.medicalInfo || '—'}</div>
+        </div>
+      </div>
+      <table class="table table-sm table-bordered">
+        <tbody>${rows.map(([k,v]) => `<tr><th class="text-muted fw-medium" style="width:40%;font-size:.82rem">${k}</th><td style="font-size:.82rem">${v}</td></tr>`).join('')}</tbody>
+      </table>`;
+    if (!document.getElementById('patientDetailModal')) {
+      const modalEl = document.createElement('div');
+      modalEl.id = 'patientDetailModal';
+      modalEl.className = 'modal fade';
+      modalEl.tabIndex = -1;
+      modalEl.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header" style="background:var(--gradient-hero)">
+          <h5 class="modal-title text-white fw-bold"><i class="bi bi-person-fill me-2"></i>Patient Profile</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="patientDetailBody"></div>
+        <div class="modal-footer"><button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
+      </div></div>`;
+      document.body.appendChild(modalEl);
+    }
+    document.getElementById('patientDetailBody').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('patientDetailModal')).show();
+  }
+  window.openPatientDetail = openPatientDetail;
+
+  // Real-time: only patients explicitly assigned by Admin to THIS caretaker.
+  document.addEventListener('vm:auth-ready', () => {
+    VmAuth.listenAssignedPatients(session.id, persons => renderPatients(persons));
+    VmAuth.listenNotifications(session.id, list => renderRecentNotifs(list));
+  });
+
+  // ── Firebase RTDB: live hardware status on dashboard (hw-linked accounts only) ──
+  if (session.hwLinked) {
+    (async () => {
+      try {
+        const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js");
+        const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/12.12.0/firebase-database.js");
+        const firebaseConfig = {
+          apiKey: "AIzaSyD6jVwkx113T305BJZoEOSrI8BcKocUOFQ",
+          authDomain: "visionmatefinal.firebaseapp.com",
+          databaseURL: "https://visionmatefinal-default-rtdb.firebaseio.com",
+          projectId: "visionmatefinal",
+          storageBucket: "visionmatefinal.firebasestorage.app",
+          messagingSenderId: "146422566914",
+          appId: "1:146422566914:web:7e413bad48cc071a6f39f4"
+        };
+        const existingApps = getApps();
+        const dashApp = existingApps.find(a => a.name === 'vm-dash') || initializeApp(firebaseConfig, 'vm-dash');
+        const db = getDatabase(dashApp);
+        let hwDisconnectTimer = null;
+                let phoneGpsText = 'Waiting for GPS…';
+
+        onValue(ref(db, 'visionmate/phone_location'), snap => {
+          const val = snap.val();
+          const lat = val ? parseFloat(val.latitude) : NaN;
+          const lon = val ? parseFloat(val.longitude) : NaN;
+          const ok = !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0;
+          phoneGpsText = ok ? `GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}` : 'Waiting for GPS…';
+          const el = document.getElementById('hwGps');
+          if (el) el.textContent = ' · ' + phoneGpsText;
+        });
+
+        onValue(ref(db, 'visionmate/latest'), snap => {
+          const val = snap.val();
+          const hwInfo   = document.getElementById('hwPersonInfo');
+          const hwBanner = document.getElementById('hwBanner');
+          const stHw     = document.getElementById('stHw');
+
+          if (val) {
+            const ts = val.timestamp ? new Date(val.timestamp) : new Date();
+            
+
+            if (hwInfo) {
+                            hwInfo.innerHTML = `<i class="bi bi-circle-fill text-success me-1" style="font-size:.55rem"></i>Live · Last update: ${ts.toLocaleTimeString()}` +
+                `<span id="hwGps"> · ${phoneGpsText}</span>`;
+            }
+            if (hwBanner) hwBanner.classList.remove('d-none');
+            if (stHw) stHw.textContent = '🟢 Live';
+
+            // Reset disconnect timer (30 s)
+            clearTimeout(hwDisconnectTimer);
+            hwDisconnectTimer = setTimeout(() => {
+              if (hwInfo) hwInfo.innerHTML = `<i class="bi bi-circle-fill text-danger me-1" style="font-size:.55rem"></i>Disconnected — no data received for 30s`;
+              if (stHw) stHw.textContent = '🔴 Off';
+            }, 30000);
+          } else {
+            if (hwInfo) hwInfo.textContent = 'Waiting for Hardware…';
+            if (stHw) stHw.textContent = '—';
+          }
+        });
+      } catch(e) {
+        console.warn('[VisionMate Dashboard] RTDB init failed:', e.message);
+      }
+    })();
+  }
+</script>
+</body>
+</html>

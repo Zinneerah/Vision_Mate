@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patients – VisionMate Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="../css/theme.css" rel="stylesheet" />
+</head>
+<body>
+<div id="sidebarMount"></div>
+<div class="main-wrapper">
+  <div id="topbarMount"></div>
+  <main class="content-area">
+
+    <!-- Filters + Add -->
+    <div class="section-card mb-4">
+      <div class="card-body d-flex flex-wrap gap-3 align-items-center">
+        <input type="search" id="buSearch" class="form-control" placeholder="Search by name, condition, zone…" style="max-width:280px" />
+        <select id="zoneFilter" class="form-select" style="max-width:200px">
+          <option value="">All Zones</option>
+        </select>
+        <select id="monFilter" class="form-select" style="max-width:180px">
+          <option value="">All Monitoring</option>
+          <option>Active</option>
+          <option>Inactive</option>
+        </select>
+        <select id="assignFilter" class="form-select" style="max-width:180px">
+          <option value="">All Assignments</option>
+          <option value="assigned">Assigned</option>
+          <option value="unassigned">Unassigned</option>
+        </select>
+        <span class="ms-auto text-muted small" id="countLabel"></span>
+        <button class="btn btn-primary-vm btn-sm" id="addPatientBtn"><i class="bi bi-plus-lg me-1"></i>Add Patient</button>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal fade" id="buModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header" style="background:var(--gradient-btn)">
+            <h5 class="modal-title text-white"><i class="bi bi-person-fill me-2"></i>Patient Profile</h5>
+            <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="buModalBody"></div>
+          <div class="modal-footer flex-wrap gap-2" id="buModalFooter">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assign Modal -->
+    <div class="modal fade" id="assignModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-person-check-fill me-2"></i>Assign Patient to Caretaker</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="assignPatientId" />
+            <p class="text-muted small mb-3">Assigning: <strong id="assignPatientName"></strong></p>
+            <label class="form-label small fw-medium">Select Caretaker</label>
+            <select class="form-select" id="assignCaretakerSelect">
+              <option value="">— Unassigned —</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary-vm btn-sm" id="saveAssignBtn">Save Assignment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add / Edit Patient Modal -->
+    <div class="modal fade" id="patientFormModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="patientFormTitle"><i class="bi bi-person-plus-fill me-2"></i>Add Patient</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="pfId" />
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label small fw-medium">Full Name *</label><input class="form-control" id="pfName" /></div>
+              <div class="col-md-3"><label class="form-label small fw-medium">Age *</label><input type="number" class="form-control" id="pfAge" /></div>
+              <div class="col-md-3"><label class="form-label small fw-medium">Gender *</label>
+                <select class="form-select" id="pfGender"><option>Male</option><option>Female</option><option>Other</option></select>
+              </div>
+              <div class="col-12"><label class="form-label small fw-medium">Address *</label><input class="form-control" id="pfAddress" /></div>
+              <div class="col-md-6"><label class="form-label small fw-medium">Contact Number *</label><input class="form-control" id="pfContact" /></div>
+              <div class="col-md-6"><label class="form-label small fw-medium">Emergency Contact *</label><input class="form-control" id="pfEmergency" /></div>
+              <div class="col-12"><label class="form-label small fw-medium">Medical Condition / Diagnosis *</label><input class="form-control" id="pfMedical" /></div>
+              <div class="col-12"><label class="form-label small fw-medium">Other Conditions</label><input class="form-control" id="pfOther" /></div>
+              <div class="col-md-6"><label class="form-label small fw-medium">Monitoring Status</label>
+                <select class="form-select" id="pfMonitoring"><option>Active</option><option>Inactive</option><option>Monitoring</option></select>
+              </div>
+              <div class="col-md-6"><label class="form-label small fw-medium">Assign Caretaker</label>
+                <select class="form-select" id="pfCaretaker"><option value="">— Unassigned —</option></select>
+              </div>
+              <div class="col-12"><label class="form-label small fw-medium">Clinical Notes</label><textarea class="form-control" id="pfNotes" rows="2"></textarea></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary-vm btn-sm" id="savePatientBtn">Save Patient</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirm -->
+    <div class="modal fade" id="deletePatModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Delete Patient Record</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0">Permanently delete <strong id="delPatName"></strong>'s record? This cannot be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-danger btn-sm" id="confirmDeletePatBtn">Delete Permanently</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="section-card">
+      <div class="card-header"><i class="bi bi-person-fill"></i> All Patients <span class="badge bg-primary ms-2" id="tableCount">0</span></div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Name</th><th>Zone</th><th>Caretaker</th><th>Age</th><th>Gender</th><th>Condition</th><th>Monitoring</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="buTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module" src="../js/admin-firestore.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/layout.js"></script>
+<script>
+  vmRequireAdmin(); // Admin-only: create, assign, edit, and delete patients all gated here.
+  document.getElementById('sidebarMount').innerHTML = PortalLayout.getSidebarHTML('Patients');
+  document.getElementById('topbarMount').innerHTML  = PortalLayout.getTopbarHTML('Patient Management', 'All registered patients — assign caretakers, edit, or remove records');
+
+  const { zones, caretakers: staticCaretakers, blindUsers } = VM_DATA;
+  let firestoreCaretakers = [];
+  let firestorePatients = [];
+  let allPatients = [...blindUsers.map(u => ({ ...u, isFirestoreOnly: false, firestoreId: null, patientName: u.name, contact: u.contact }))];
+  let filtered = [...allPatients];
+
+  const zf = document.getElementById('zoneFilter');
+  zones.forEach(z => { const o = document.createElement('option'); o.value = z.id; o.textContent = z.name; zf.appendChild(o); });
+
+  // Pre-filter by caretaker if URL param
+  const urlCt = new URLSearchParams(location.search).get('ct');
+
+  function allCaretakersList() {
+    // Combine static + Firestore caretakers for the assignment dropdown
+    const merged = [...staticCaretakers];
+    firestoreCaretakers.forEach(fc => {
+      const idx = merged.findIndex(c => c.id === fc.firestoreId || c.email === fc.email);
+      const rec = { id: fc.firestoreId, name: fc.fullName || fc.name, zoneName: fc.zone };
+      if (idx >= 0) merged[idx] = { ...merged[idx], ...rec };
+      else merged.push(rec);
+    });
+    return merged;
+  }
+
+  function rebuildPatientList() {
+    // Avoid duplicating Shahbaz Qureshi: the Firestore-seeded record
+    // (pt_shahbaz_1) replaces the static demo record (bu_11) it was
+    // seeded from, identified via legacyId.
+    const supersededLegacyIds = new Set(
+      firestorePatients.map(p => p.legacyId).filter(Boolean)
+    );
+    const staticList = blindUsers
+      .filter(u => !supersededLegacyIds.has(u.id))
+      .map(u => ({ ...u, isFirestoreOnly: false, firestoreId: null, patientName: u.name }));
+    const fsList = firestorePatients.map(p => ({
+      id: p.firestoreId,
+      firestoreId: p.firestoreId,
+      isFirestoreOnly: true,
+      name: p.patientName || p.name || '—',
+      patientName: p.patientName || p.name || '—',
+      age: p.age, gender: p.gender,
+      address: p.address || '—',
+      medicalInfo: p.disease || p.medicalInfo || '—',
+      otherConditions: p.otherConditions || '',
+      contact: p.contact || '—',
+      emergencyContact: p.emergencyContact || '—',
+      monitoringStatus: p.monitoringStatus || 'Active',
+      notes: p.notes || '',
+      caretakerId: p.assignedCaretakerId || null,
+      caretakerName: p.assignedCaretakerName || (allCaretakersList().find(c => c.id === p.assignedCaretakerId)?.name) || 'Unassigned',
+      zoneId: allCaretakersList().find(c => c.id === p.assignedCaretakerId)?.zoneId || null,
+      zoneName: allCaretakersList().find(c => c.id === p.assignedCaretakerId)?.zoneName || '—',
+      hardwareLinked: !!p.hardwareLinked
+    }));
+    allPatients = [...staticList, ...fsList];
+    applyFilters();
+  }
+
+  document.addEventListener('vm:adminfs-ready', () => {
+    AdminFS.listenCaretakers(fsList => {
+      firestoreCaretakers = fsList;
+      populateCaretakerSelects();
+      rebuildPatientList();
+    });
+    AdminFS.listenPatients(fsList => {
+      firestorePatients = fsList;
+      rebuildPatientList();
+    });
+  });
+
+  function populateCaretakerSelects() {
+    const list = allCaretakersList();
+    [document.getElementById('assignCaretakerSelect'), document.getElementById('pfCaretaker')].forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— Unassigned —</option>' +
+        list.map(c => `<option value="${c.id}">${c.name} (${c.zoneName||'—'})</option>`).join('');
+      sel.value = current;
+    });
+  }
+
+  function render() {
+    const tbody = document.getElementById('buTable');
+    tbody.innerHTML = filtered.map(u => {
+      const z  = zones.find(z => z.id === u.zoneId);
+      const hw = u.hardwareLinked ? hwBadge() : '';
+      const caretakerLabel = u.caretakerName || u.caretakerId || 'Unassigned';
+      const deletable = u.isFirestoreOnly;
+      return `<tr>
+        <td><strong>${u.name}</strong>${hw}</td>
+        <td>${z ? `<span class="badge" style="background:${z.color}20;color:${z.color}">${z.name}</span>` : `<span class="text-muted small">${u.zoneName||'—'}</span>`}</td>
+        <td>${caretakerLabel === 'Unassigned' ? '<span class="badge bg-secondary">Unassigned</span>' : caretakerLabel}</td>
+        <td>${u.age}</td>
+        <td>${u.gender}</td>
+        <td class="small text-muted" style="max-width:200px;white-space:normal">${u.medicalInfo}</td>
+        <td>${monBadge(u.monitoringStatus)}</td>
+        <td class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-primary" onclick="showProfile('${u.id}')" title="View Profile"><i class="bi bi-eye-fill"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="openAssign('${u.id}')" title="Assign Caretaker"><i class="bi bi-person-check-fill"></i></button>
+          ${deletable ? `<button class="btn btn-sm btn-outline-warning" onclick="openEditPatient('${u.id}')" title="Edit"><i class="bi bi-pencil-fill"></i></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="confirmDeletePatient('${u.id}','${(u.name||'').replace(/'/g, "\\'")}')" title="Delete"><i class="bi bi-trash-fill"></i></button>` : ''}
+        </td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8" class="text-center text-muted py-4">No patients found.</td></tr>';
+    document.getElementById('tableCount').textContent = filtered.length;
+    document.getElementById('countLabel').textContent = `Showing ${filtered.length} of ${allPatients.length}`;
+  }
+
+  function applyFilters() {
+    const q  = document.getElementById('buSearch').value.toLowerCase();
+    const z  = document.getElementById('zoneFilter').value;
+    const m  = document.getElementById('monFilter').value;
+    const a  = document.getElementById('assignFilter').value;
+    filtered = allPatients.filter(u => {
+      const matchesQ = !q || (u.name||'').toLowerCase().includes(q) || (u.medicalInfo||'').toLowerCase().includes(q) ||
+        (u.zoneName||'').toLowerCase().includes(q) || (u.caretakerName||'').toLowerCase().includes(q);
+      const matchesZ = !z || u.zoneId === z;
+      const matchesM = !m || u.monitoringStatus === m;
+      const isAssigned = !!(u.caretakerId);
+      const matchesA = !a || (a === 'assigned' ? isAssigned : !isAssigned);
+      return matchesQ && matchesZ && matchesM && matchesA;
+    });
+    if (urlCt) filtered = filtered.filter(u => u.caretakerId === urlCt);
+    render();
+  }
+
+  document.getElementById('buSearch').addEventListener('input', applyFilters);
+  document.getElementById('zoneFilter').addEventListener('change', applyFilters);
+  document.getElementById('monFilter').addEventListener('change', applyFilters);
+  document.getElementById('assignFilter').addEventListener('change', applyFilters);
+
+  const modal = new bootstrap.Modal(document.getElementById('buModal'));
+  const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+  const patientFormModal = new bootstrap.Modal(document.getElementById('patientFormModal'));
+  const deletePatModal = new bootstrap.Modal(document.getElementById('deletePatModal'));
+
+  function showProfile(id) {
+    const u = allPatients.find(u => u.id === id);
+    if (!u) return;
+    const z = zones.find(z => z.id === u.zoneId);
+    const hw = u.hardwareLinked ? `<div class="alert alert-warning py-2 px-3 d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-cpu-fill"></i><strong>Hardware-Monitored Patient</strong> — Live sensor data streaming via VisionMate device.
+      <a href="monitoring.html" class="btn btn-sm btn-warning ms-auto">Open Monitor</a>
+    </div>` : '';
+    document.getElementById('buModalBody').innerHTML = `
+      ${hw}
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="user-pill-avatar" style="width:64px;height:64px;font-size:1.4rem;background:var(--gradient-btn)">${getInitial(u.name)}</div>
+        <div>
+          <h5 class="mb-0">${u.name}</h5>
+          <div class="text-muted small">${u.zoneName||'—'} • ${u.gender} • ${u.age} years</div>
+          ${monBadge(u.monitoringStatus)}
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-12"><div class="step-card" style="background:#FEF2F2;border-color:#FECACA">
+          <div class="text-muted small mb-1">Medical Condition</div>
+          <div class="fw-semibold">${u.medicalInfo}</div>
+        </div></div>
+        <div class="col-12"><div class="step-card" style="background:#FFFBEB;border-color:#FEF3C7">
+          <div class="text-muted small mb-1">Additional Conditions</div>
+          <div>${u.otherConditions || 'None'}</div>
+        </div></div>
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Address</div><div class="fw-medium">${u.address}</div></div></div>
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Contact</div><div class="fw-medium">${u.contact}</div></div></div>
+        <div class="col-12"><div class="step-card" style="background:#FEF2F2;border-color:#FECACA">
+          <div class="text-muted small mb-1"><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Emergency Contact</div>
+          <div class="fw-semibold">${u.emergencyContact}</div>
+        </div></div>
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Assigned Caretaker</div>
+          <div class="fw-medium">${u.caretakerName && u.caretakerId ? `<a href="caretakers.html?ct=${u.caretakerId}" onclick="bootstrap.Modal.getInstance(document.getElementById('buModal')).hide()">${u.caretakerName}</a>` : '<span class="badge bg-secondary">Unassigned</span>'}</div>
+        </div></div>
+        <div class="col-md-6"><div class="step-card"><div class="text-muted small">Zone</div>
+          <div class="fw-medium" style="color:${z?.color||'inherit'}">${u.zoneName||'—'}</div>
+        </div></div>
+        <div class="col-12"><div class="step-card"><div class="text-muted small mb-1">Clinical Notes</div><div>${u.notes||'—'}</div></div></div>
+      </div>`;
+    const footer = document.getElementById('buModalFooter');
+    footer.innerHTML = `
+      <button class="btn btn-outline-secondary btn-sm" onclick="bootstrap.Modal.getInstance(document.getElementById('buModal')).hide();openAssign('${u.id}')"><i class="bi bi-person-check-fill me-1"></i>Reassign</button>
+      ${u.isFirestoreOnly ? `<button class="btn btn-outline-warning btn-sm" onclick="bootstrap.Modal.getInstance(document.getElementById('buModal')).hide();openEditPatient('${u.id}')"><i class="bi bi-pencil-fill me-1"></i>Edit</button>
+      <button class="btn btn-outline-danger btn-sm" onclick="bootstrap.Modal.getInstance(document.getElementById('buModal')).hide();confirmDeletePatient('${u.id}','${(u.name||'').replace(/'/g, "\\'")}')"><i class="bi bi-trash-fill me-1"></i>Delete</button>` : ''}
+      <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>`;
+    modal.show();
+  }
+
+  function openAssign(id) {
+    const u = allPatients.find(u => u.id === id);
+    if (!u) return;
+    document.getElementById('assignPatientId').value = id;
+    document.getElementById('assignPatientName').textContent = u.name;
+    populateCaretakerSelects();
+    document.getElementById('assignCaretakerSelect').value = u.caretakerId || '';
+    assignModal.show();
+  }
+
+  document.getElementById('saveAssignBtn').addEventListener('click', async () => {
+    const id = document.getElementById('assignPatientId').value;
+    const u = allPatients.find(u => u.id === id);
+    const caretakerId = document.getElementById('assignCaretakerSelect').value;
+    const caretakerName = caretakerId ? allCaretakersList().find(c => c.id === caretakerId)?.name : null;
+
+    if (!u.isFirestoreOnly) {
+      alert('This is a static demo patient record (not in Firestore) and cannot be reassigned. Add a new patient via "Add Patient" to test live assignment.');
+      assignModal.hide();
+      return;
+    }
+    try {
+      await AdminFS.assignPatient(u.firestoreId, caretakerId || null, caretakerName);
+      assignModal.hide();
+    } catch (e) {
+      alert('Assignment failed: ' + e.message);
+    }
+  });
+
+  // ── Add / Edit Patient ──────────────────────────────────────
+  document.getElementById('addPatientBtn').addEventListener('click', () => {
+    document.getElementById('patientFormTitle').innerHTML = '<i class="bi bi-person-plus-fill me-2"></i>Add Patient';
+    document.getElementById('pfId').value = '';
+    ['pfName','pfAge','pfAddress','pfContact','pfEmergency','pfMedical','pfOther','pfNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('pfGender').value = 'Male';
+    document.getElementById('pfMonitoring').value = 'Active';
+    populateCaretakerSelects();
+    document.getElementById('pfCaretaker').value = '';
+    patientFormModal.show();
+  });
+
+  function openEditPatient(id) {
+    const u = allPatients.find(u => u.id === id);
+    if (!u || !u.isFirestoreOnly) return;
+    document.getElementById('patientFormTitle').innerHTML = '<i class="bi bi-pencil-fill me-2"></i>Edit Patient';
+    document.getElementById('pfId').value = u.firestoreId;
+    document.getElementById('pfName').value = u.name || '';
+    document.getElementById('pfAge').value = u.age || '';
+    document.getElementById('pfGender').value = u.gender || 'Male';
+    document.getElementById('pfAddress').value = u.address || '';
+    document.getElementById('pfContact').value = u.contact || '';
+    document.getElementById('pfEmergency').value = u.emergencyContact || '';
+    document.getElementById('pfMedical').value = u.medicalInfo || '';
+    document.getElementById('pfOther').value = u.otherConditions || '';
+    document.getElementById('pfMonitoring').value = u.monitoringStatus || 'Active';
+    document.getElementById('pfNotes').value = u.notes || '';
+    populateCaretakerSelects();
+    document.getElementById('pfCaretaker').value = u.caretakerId || '';
+    patientFormModal.show();
+  }
+
+  document.getElementById('savePatientBtn').addEventListener('click', async () => {
+    const id = document.getElementById('pfId').value;
+    const name = document.getElementById('pfName').value.trim();
+    if (!name) { alert('Full Name is required.'); return; }
+    const caretakerId = document.getElementById('pfCaretaker').value;
+    const caretakerName = caretakerId ? allCaretakersList().find(c => c.id === caretakerId)?.name : null;
+    const data = {
+      patientName: name,
+      age: Number(document.getElementById('pfAge').value) || null,
+      gender: document.getElementById('pfGender').value,
+      address: document.getElementById('pfAddress').value.trim(),
+      contact: document.getElementById('pfContact').value.trim(),
+      emergencyContact: document.getElementById('pfEmergency').value.trim(),
+      disease: document.getElementById('pfMedical').value.trim(),
+      otherConditions: document.getElementById('pfOther').value.trim(),
+      monitoringStatus: document.getElementById('pfMonitoring').value,
+      notes: document.getElementById('pfNotes').value.trim(),
+      assignedCaretakerId: caretakerId || null,
+      assignedCaretakerName: caretakerName
+    };
+    try {
+      if (id) {
+        await AdminFS.updatePatient(id, data);
+      } else {
+        await AdminFS.createPatient(data);
+      }
+      patientFormModal.hide();
+    } catch (e) {
+      alert('Save failed: ' + e.message);
+    }
+  });
+
+  function confirmDeletePatient(id, name) {
+    const u = allPatients.find(u => u.id === id);
+    if (!u || !u.isFirestoreOnly) return;
+    document.getElementById('delPatName').textContent = name;
+    document.getElementById('confirmDeletePatBtn').onclick = async () => {
+      try {
+        await AdminFS.deletePatient(u.firestoreId, u.caretakerId);
+        deletePatModal.hide();
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    };
+    deletePatModal.show();
+  }
+
+  window.showProfile = showProfile;
+  window.openAssign = openAssign;
+  window.openEditPatient = openEditPatient;
+  window.confirmDeletePatient = confirmDeletePatient;
+
+  render();
+
+  const urlBu = new URLSearchParams(location.search).get('bu');
+  if (urlBu) { setTimeout(() => showProfile(urlBu), 300); }
+</script>
+</body>
+</html>
